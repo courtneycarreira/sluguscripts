@@ -448,17 +448,17 @@ def main():
     # Compose the email
     from_addr_spec = MAIL_USERNAME if not DEMO_MODE else 'astro-stewarxiv@list.arizona.edu'
     from_addr = Address("StewarXiv", addr_spec=from_addr_spec)
-    to_addr_spec = MAIL_SENDTO if not DEMO_MODE else 'nfranz@arizona.edu'
-    to_addrs = [
-        Address("StewarXiv", addr_spec=to_addr_spec)
-    ]
+    # decide who to send to depending on content or demoing
+    if not DEMO_MODE and len(posts) > 0:
+        to_addrs = [Address("StewarXiv", addr_spec=MAIL_SENDTO)]
+    else:
+        to_addrs = [Address("ADMIN", addr_spec=MAIL_USERNAME)]
     subject = f'{day_of_week}\'s update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
     # Compose the email (also CC the sender of the email)
     msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing,
         cc_addresses=from_addr)
     # Send the email
-    if not DEMO_MODE and len(posts) > 0:
-        send_email(msg)
+    send_email(msg)
 
 if __name__ == "__main__":
     logging.basicConfig(level='WARN')
