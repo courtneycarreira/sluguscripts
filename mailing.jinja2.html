@@ -41,9 +41,33 @@
         <a href="https://arxiv.org/html/{{ post.html_arxiv_id }}" style="{{ button_styles }} border-color: black; border-color: {{ area_color }}; color: {{ area_color }}; background: #eee;">View HTML</a>
     </h2>
     <h2 style="font-weight: normal; font-size: {{ font_size_reg - 2}}px;">
-        {% for author in post.authors %}
-        {% include "author.jinja2.html" %}{% if not loop.last %},{% endif %}
-        {% endfor %}
+
+      <!-- "collaboration" papers with super long author lists -->
+      {% if post.authors|count > 20 %}
+          {% for author in post.authors[:20] %}
+	      {% include "author.jinja2.html" %}{% if not loop.last %},{% endif %}
+	  {% endfor %}
+	  et al. (with {{ post.authors[20:]|count }} other authors
+	  {% set incl=False %}
+	  {% for author in post.authors[20:] %}
+	      {% with name = author[0]|replace(" ", "&nbsp;")|safe, key = author[1][0], score = author[1][1] %}
+               {% if key %}
+	          {% if not incl %}
+                      incl.
+                      {% set incl=True %}
+	          {% endif %}
+	          {% include "author.jinja2.html" %}
+              {% endif %}
+	      {% endwith %}
+	  {% endfor %}
+	  )
+          
+      <!-- everything else (regular papers) -->
+      {% else %}
+          {% for author in post.authors %}
+              {% include "author.jinja2.html" %}{% if not loop.last %},{% endif %}
+          {% endfor %}
+      {% endif %}
     </h2>
     <details>
         <summary><strong>Abstract</strong></summary>
