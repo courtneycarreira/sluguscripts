@@ -57,3 +57,9 @@ Anyway, I would suggest:
 7. We change the list config back so your messages go straight through without going to a queue
 8. I disable my instance of the arxiv-mailer
 9. Go to sleep and hope for the best the next day!
+
+
+## Development Workflow (Vikram)
+
+1. Load mailer environment
+2. 

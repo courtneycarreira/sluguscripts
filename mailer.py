@@ -28,7 +28,7 @@ import io
 from config import *
 
 log = logging.getLogger(__name__)
-DEMO_MODE = False
+DEMO_MODE = True
 
 HERE = os.path.dirname(__file__)
 
