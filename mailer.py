@@ -28,7 +28,7 @@ import io
 from config import *
 
 log = logging.getLogger(__name__)
-DEMO_MODE = True
+DEMO_MODE = False
 
 HERE = os.path.dirname(__file__)
 
@@ -79,8 +79,12 @@ def build_directory():
 
     faculty_page = soupify('https://astro.arizona.edu/people/all-faculty')
     for facwrap in faculty_page.select('.card-body'):
-        name = tuple(filter(None, facwrap.select_one('h1').text.split('\n')))
-        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1] # lower case and reverse order
+
+        h1 = facwrap.select_one('h1')
+        firstname = h1.select_one('.field--name-field-az-fname').text.strip()
+        lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
+        name = (firstname, lastname)
+        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
 
         # retrieve link to individual page
         ind_page_link = facwrap.find_all('a', href=True)[0]['href']
@@ -138,8 +142,12 @@ def build_directory():
 
     student_page = soupify('https://astro.arizona.edu/people/graduate-students')
     for wrap in student_page.select('.card-body'):
-        name = tuple(filter(None, wrap.select_one('h1').text.split('\n')))
-        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1] #case and reverse order
+
+        h1 = wrap.select_one('h1')
+        firstname = h1.select_one('.field--name-field-az-fname').text.strip()
+        lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
+        name = (firstname, lastname)
+        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
 
         # retrieve link to individual page
         ind_page_link = wrap.find_all('a', href=True)[0]['href']
@@ -161,8 +169,12 @@ def build_directory():
 
     staff_page = soupify('https://astro.arizona.edu/people/staff')
     for wrap in staff_page.select('.card-body'):
-        name = tuple(filter(None, wrap.select_one('h1').text.split('\n')))
-        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1] #case and reverse order
+
+        h1 = wrap.select_one('h1')
+        firstname = h1.select_one('.field--name-field-az-fname').text.strip()
+        lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
+        name = (firstname, lastname)
+        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
 
         # retrieve link to individual page
         ind_page_link = wrap.find_all('a', href=True)[0]['href']

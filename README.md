@@ -62,4 +62,5 @@ Anyway, I would suggest:
 ## Development Workflow (Vikram)
 
 1. Load mailer environment
-2. 
+2. If running the file in terminal: python mailer.py
+3. If running the file in the debugger, open the debug panel on the left of vscode and then run from there to ensure you are running in the correct environment.
