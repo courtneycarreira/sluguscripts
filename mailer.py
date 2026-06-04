@@ -194,6 +194,8 @@ def build_directory():
             'page': base_link + ind_page_link,
         }
 
+    print("finished building directory")
+
     return people
 
 NAME_RE = re.compile(r'^(?P<first>(?:(?P<initial>\w).*)[\. ]+)+(?P<last>\w.*)$')
