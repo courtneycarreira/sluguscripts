@@ -1,13 +1,7 @@
-mailing.eml
-mailing.html
-mailing.txt
 __pycache__
 .ipynb_checkpoints
 .pytest_cache
 *.pickle
-test.sh
-run_mailer*.sh
 logs/
-credentials.sh
-config.py
-.vscode/
+.mailer-venv/
+.DS_Store

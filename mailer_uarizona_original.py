@@ -36,7 +36,7 @@ def soupify(url):
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        req = requests.get(url, verify=False, headers=headers)
+        req = requests.get(url, verify=False)
     return BeautifulSoup(req.text, features="lxml")
 
 FACULTY = 1
@@ -44,21 +44,17 @@ POSTDOC = 2
 STAFF = 2
 STUDENT = 3
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-
 
 def gather_affiliation_evidence(arxiv_id):
     url = f'https://arxiv.org/e-print/{arxiv_id}'
     evidence = 0
     try:
-        res = requests.get(url, headers=headers)
+        res = requests.get(url)
         buff = io.BytesIO(res.content)
         archive = tarfile.open(fileobj=buff)
         texfiles = [m for m in archive.getmembers() if m.name.lower().endswith('.tex')]
 
-        UOFA_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu)', flags=re.IGNORECASE)
+        UOFA_RE = re.compile(r'(university of arizona|steward observatory|arizona\.edu|lbto\.org|gmto\.org)', flags=re.IGNORECASE)
 
         for info in texfiles:
             fh = archive.extractfile(info)
@@ -79,135 +75,127 @@ def normalize_caseless(text):
 
 def build_directory():
     people = {}
-    base_link = 'https://astronomy.ucsc.edu'
+    base_link = 'https://astro.arizona.edu'
 
-    faculty_page = soupify('https://astronomy.ucsc.edu/people/#faculty')
-    for facwrap in faculty_page.select('.item-body'): #'.section-item h-card wrap'):
+    faculty_page = soupify('https://astro.arizona.edu/people/all-faculty')
+    for facwrap in faculty_page.select('.card-body'):
 
-        # print(facwrap)
-
-        h1 = facwrap.select_one('h3')
-        # print(h1)
-        name = normalize_caseless(h1.select_one('.p-name').text.strip()).split(' ')
-        # print(name)
-        # print(firstname)
-        # lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
-        # name = (firstname, lastname)
-        back = " ".join(name[:-1])
-        # print(back)
-        name = (name[-1], back)
-        # print(name)
+        h1 = facwrap.select_one('h1')
+        firstname = h1.select_one('.field--name-field-az-fname').text.strip()
+        lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
+        name = (firstname, lastname)
+        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
+        print(name)
 
         # retrieve link to individual page
-        # ind_page_link = facwrap.find_all('a', href=True)[0]['href']
-        # ind_page = soupify(base_link + ind_page_link)
+        ind_page_link = facwrap.find_all('a', href=True)[0]['href']
+        ind_page = soupify(base_link + ind_page_link)
 
         # get position
-        # try:
-        #     position = h1.select_one(".item-info list-renderer")#[0].text.replace('\n', '')
-        #     print(position)
-        # except Exception as e:
-        #     log.warning(f"Failed to get position for {name}")
-        #     continue
-        # # get image
-        # try:
-        #     image = base_link + ind_page.select('article')[0].select_one('img')['src']
-        # except Exception as e:
-        #     log.warning(f"Unable to find image for {name}")
-        #     image = None
+        try:
+            position = ind_page.find_all("div", class_="field--name-field-az-titles")[0].text.replace('\n', '')
+        except Exception as e:
+            log.warning(f"Failed to get position for {name}")
+            continue
+        # get image
+        try:
+            image = base_link + ind_page.select('article')[0].select_one('img')['src']
+        except Exception as e:
+            log.warning(f"Unable to find image for {name}")
+            image = None
 
         people[name]= {
             'role': FACULTY,
-            # 'position': position,
-            # 'image': image, 
-            # 'page': base_link + ind_page_link,
+            'position': position,
+            'image': image, 
+            'page': base_link + ind_page_link,
         }
 
-    # postdoc_page = soupify('https://astronomy.ucsc.edu/people/#postdoc')
-    # for wrap in postdoc_page.select('.card-body'):
-    #     name = tuple(wrap.select('h3')[0].text.replace('\n', '').split(' ', 1))
-    #     name = tuple(normalize_caseless(part.strip()) for part in name)[::-1] # lower case and reverse order
+    postdoc_page = soupify('https://astro.arizona.edu/people/postdocs')
+    for wrap in postdoc_page.select('.card-body'):
+        name = tuple(wrap.select('h3')[0].text.replace('\n', '').split(' ', 1))
+        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1] # lower case and reverse order
 
-    #     # retrieve link to individual page
-    #     ind_page_link = wrap.find_all('a', href=True)[0]['href']
-    #     ind_page = soupify(base_link + ind_page_link)
+        # retrieve link to individual page
+        ind_page_link = wrap.find_all('a', href=True)[0]['href']
+        ind_page = soupify(base_link + ind_page_link)
 
-    #     # get position
-    #     try:
-    #         position = ind_page.find_all("div", class_="field--name-field-az-titles")[0].text.replace('\n', '')
-    #     except Exception as e:
-    #         log.warning(f"Failed to get position for {name}")
-    #         continue
+        # get position
+        try:
+            position = ind_page.find_all("div", class_="field--name-field-az-titles")[0].text.replace('\n', '')
+        except Exception as e:
+            log.warning(f"Failed to get position for {name}")
+            continue
         
-    #     # get image
-    #     try:
-    #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
-    #     except Exception as e:
-    #         log.warning(f"Unable to find image for {name}")
-    #         image = None
+        # get image
+        try:
+            image = base_link + ind_page.select('article')[0].select_one('img')['src']
+        except Exception as e:
+            log.warning(f"Unable to find image for {name}")
+            image = None
 
-    #     people[name]= {
-    #         'role': POSTDOC,
-    #         'position': position,
-    #         'image': image,
-    #         'page': base_link + ind_page_link,
-    #     }
+        people[name]= {
+            'role': POSTDOC,
+            'position': position,
+            'image': image,
+            'page': base_link + ind_page_link,
+        }
 
-    # student_page = soupify('https://astronomy.ucsc.edu/people/#grads')
-    # for wrap in student_page.select('.card-body'):
+    student_page = soupify('https://astro.arizona.edu/people/graduate-students')
+    for wrap in student_page.select('.card-body'):
 
-    #     h1 = wrap.select_one('h1')
-    #     firstname = h1.select_one('.field--name-field-az-fname').text.strip()
-    #     lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
-    #     name = (firstname, lastname)
-    #     name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
+        h1 = wrap.select_one('h1')
+        firstname = h1.select_one('.field--name-field-az-fname').text.strip()
+        lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
+        name = (firstname, lastname)
+        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
 
-    #     # retrieve link to individual page
-    #     ind_page_link = wrap.find_all('a', href=True)[0]['href']
-    #     ind_page = soupify(base_link + ind_page_link)
+        # retrieve link to individual page
+        ind_page_link = wrap.find_all('a', href=True)[0]['href']
+        ind_page = soupify(base_link + ind_page_link)
 
-    #     # get image
-    #     try:
-    #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
-    #     except Exception as e:
-    #         log.warning(f"Unable to find image for {name}")
-    #         image = None
+        # get image
+        try:
+            image = base_link + ind_page.select('article')[0].select_one('img')['src']
+        except Exception as e:
+            log.warning(f"Unable to find image for {name}")
+            image = None
 
-    #     people[name]= {
-    #         'role': STUDENT,
-    #         'position': 'Graduate Student',
-    #         'image': image,
-    #         'page': base_link + ind_page_link,
-    #     }
+        people[name]= {
+            'role': STUDENT,
+            'position': 'Graduate Student',
+            'image': image,
+            'page': base_link + ind_page_link,
+        }
 
-    # staff_page = soupify('https://astro.arizona.edu/people/staff')
-    # for wrap in staff_page.select('.card-body'):
+    staff_page = soupify('https://astro.arizona.edu/people/staff')
+    for wrap in staff_page.select('.card-body'):
 
-    #     h1 = wrap.select_one('h1')
-    #     firstname = h1.select_one('.field--name-field-az-fname').text.strip()
-    #     lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
-    #     name = (firstname, lastname)
-    #     name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
+        h1 = wrap.select_one('h1')
+        firstname = h1.select_one('.field--name-field-az-fname').text.strip()
+        lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
+        name = (firstname, lastname)
+        name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
 
-    #     # retrieve link to individual page
-    #     ind_page_link = wrap.find_all('a', href=True)[0]['href']
-    #     ind_page = soupify(base_link + ind_page_link)
+        # retrieve link to individual page
+        ind_page_link = wrap.find_all('a', href=True)[0]['href']
+        ind_page = soupify(base_link + ind_page_link)
 
-    #     # get image
-    #     try:
-    #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
-    #     except Exception as e:
-    #         log.warning(f"Unable to find image for {name}")
-    #         image = None
+        # get image
+        try:
+            image = base_link + ind_page.select('article')[0].select_one('img')['src']
+        except Exception as e:
+            log.warning(f"Unable to find image for {name}")
+            image = None
 
-    #     people[name]= {
-    #         'role': STAFF,
-    #         'position': 'Staff',
-    #         'image': image,
-    #         'page': base_link + ind_page_link,
-    #     }
+        people[name]= {
+            'role': STAFF,
+            'position': 'Staff',
+            'image': image,
+            'page': base_link + ind_page_link,
+        }
 
-    # print("finished building directory")
+    print("finished building directory")
 
     return people
 
@@ -304,7 +292,7 @@ def gather_affiliation_evidence(arxiv_id):
     gather_success = False
     try:
         log.debug(f"Gathering evidence from {url}")
-        res = requests.get(url, headers=headers)
+        res = requests.get(url)
         buff = io.BytesIO(res.content)
         archive = tarfile.open(fileobj=buff)
         texfiles = [m for m in archive.getmembers() if m.name.lower().endswith('.tex')]
@@ -326,13 +314,11 @@ def unpack_feed_entry(post, people):
         BeautifulSoup(post.author, features="lxml").text.split(',')]
     authors = [(name, approximate_name_lookup(name, people)) for name in author_names]
     our_people_score = sum(item[1][1] for item in authors)
-    print(our_people_score)
     if our_people_score < 1:
         return
     else:
         log.info(f"Found {our_people_score=} from {authors=}")
     arxiv_id = post.link.rsplit('/', 1)[1]
-
     if not DEMO_MODE or DEMO_MODE:
         evidence, gather_success = gather_affiliation_evidence(arxiv_id)
         if gather_success and evidence == 0:
@@ -358,11 +344,9 @@ def get_matching_posts(people):
     feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph')
     posts = []
     all_authors = []
-    print(feed.entries)
-    update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
-    print(update_day)
-    pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
-    today = datetime.datetime.now(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
+    update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date()
+    pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date()
+    today = datetime.datetime.now(datetime.timezone.utc).date()
     if (update_day - today).days != 0:
         log.warn(f"Mailer was invoked but feed was last updated on {update_day} UTC")
         sys.exit(1)
@@ -371,9 +355,7 @@ def get_matching_posts(people):
                  f"published on {pub_day} UTC")
         sys.exit(1)
     for post in feed.entries:
-        # print(post)
         unpacked_post = unpack_feed_entry(post, people)
-        print(unpacked_post)
         if unpacked_post:
             posts.append(unpacked_post)
             for author in unpacked_post['authors']:
@@ -413,7 +395,7 @@ def compose_email(from_address, to_addresses, subject, html_mailing, text_mailin
         msg['CC'] = cc_addresses
     msg.set_content(text_mailing)
     msg.add_alternative(html_mailing, subtype='html')
-    if True: #DEMO_MODE:
+    if DEMO_MODE:
         with open('mailing.eml', 'wb') as f:
             f.write(bytes(msg))
     return msg
@@ -437,10 +419,9 @@ def send_email(msg):
     smtp_server.send_message(msg)
 
 def main():
-    # global
-    DEMO_MODE = True
+    global DEMO_MODE
     run_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
-    tzmst = tz.gettz('America/Los Angeles')
+    tzmst = tz.gettz('America/Phoenix')
     run_time_local = run_time.astimezone(tzmst)
     day_of_week = run_time_local.strftime('%A')
 
@@ -448,24 +429,19 @@ def main():
         args = sys.argv[1:]
         if '-d' in args:
             DEMO_MODE = True
-
-    people = build_directory()
-
-    # if DEMO_MODE and os.path.exists('./demo.pickle'):
-    #     with open('./demo.pickle', 'rb') as f:
-    #         context = pickle.load(f)
-    #         # define locals from pickle
-    #         people = context['people']
-    #         posts = context['posts']
-    #         all_authors = context['all_authors']
-    #         # except run_time, update that in loaded dict
-    #         context['run_time'] = run_time_local.strftime('%Y-%m-%d %H:%M %Z')
-    #         context['day_of_week'] = day_of_week
-    if True: #else:
-        # people = build_directory()
-        # print(people)
+    if DEMO_MODE and os.path.exists('./demo.pickle'):
+        with open('./demo.pickle', 'rb') as f:
+            context = pickle.load(f)
+            # define locals from pickle
+            people = context['people']
+            posts = context['posts']
+            all_authors = context['all_authors']
+            # except run_time, update that in loaded dict
+            context['run_time'] = run_time_local.strftime('%Y-%m-%d %H:%M %Z')
+            context['day_of_week'] = day_of_week
+    else:
+        people = build_directory()
         posts, all_authors = get_matching_posts(people)
-        print(posts, all_authors)
         context = {
             'people': people,
             'posts': posts,
@@ -477,26 +453,26 @@ def main():
             with open('./demo.pickle', 'wb') as f:
                 pickle.dump(context, f)
 
-    html_mailing, text_mailing = render_mailing(context)
-    if DEMO_MODE:
-        with open(os.path.join(HERE, 'mailing.html'), 'w') as f:
-            f.write(html_mailing)
-        with open(os.path.join(HERE, 'mailing.txt'), 'w') as f:
-            f.write(text_mailing)
+    # html_mailing, text_mailing = render_mailing(context)
+    # if DEMO_MODE:
+    #     with open(os.path.join(HERE, 'mailing.html'), 'w') as f:
+    #         f.write(html_mailing)
+    #     with open(os.path.join(HERE, 'mailing.txt'), 'w') as f:
+    #         f.write(text_mailing)
 
-    # Compose the email
-    from_addr_spec = MAIL_USERNAME if not DEMO_MODE else 'astro-stewarxiv@list.arizona.edu'
-    from_addr = Address("StewarXiv", addr_spec=from_addr_spec)
-    # decide who to send to depending on content or demoing
-    if not DEMO_MODE and len(posts) > 0:
-        to_addrs = [] #[Address("StewarXiv", addr_spec=MAIL_SENDTO)]
-    else:
-        to_addrs = [] #[Address("ADMIN", addr_spec=MAIL_USERNAME)]
-    subject = f'{day_of_week}\'s update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
-    # Compose the email (also CC the sender of the email)
-    msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing,
-        cc_addresses=from_addr)
-    # Send the email
+    # # Compose the email
+    # from_addr_spec = MAIL_USERNAME if not DEMO_MODE else 'astro-stewarxiv@list.arizona.edu'
+    # from_addr = Address("StewarXiv", addr_spec=from_addr_spec)
+    # # decide who to send to depending on content or demoing
+    # if not DEMO_MODE and len(posts) > 0:
+    #     to_addrs = [Address("StewarXiv", addr_spec=MAIL_SENDTO)]
+    # else:
+    #     to_addrs = [Address("ADMIN", addr_spec=MAIL_USERNAME)]
+    # subject = f'{day_of_week}\'s update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
+    # # Compose the email (also CC the sender of the email)
+    # msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing,
+    #     cc_addresses=from_addr)
+    # # Send the email
     # send_email(msg)
 
 if __name__ == "__main__":
