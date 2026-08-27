@@ -19,6 +19,7 @@ import requests
 import tarfile
 import io
 import argparse
+from pylatexenc.latex2text import LatexNodes2Text
 
 from email.message import EmailMessage
 from email.headerregistry import Address
@@ -410,28 +411,35 @@ def gather_affiliation_evidence(arxiv_id):
 # unpack_feed_entry() function
 #######################################
 def unpack_feed_entry(post, people):
+
+    #pull quick information
     title = post.title
     arxiv_area = post.tags[0]['term']
-    # New arXiv RSS feed has a comma-separated author list instead of the a tag
+
+    #create author list
+    #new arXiv RSS feed has a comma-separated author list instead of the a tag
     author_names = [author.strip() for author in
         BeautifulSoup(post.author, features="lxml").text.split(',')]
-    authors = [(name, approximate_name_lookup(name, people)) for name in author_names]
+    authors = [(LatexNodes2Text().latex_to_text(name), approximate_name_lookup(name, people)) for name in author_names]
+
+    #get publication date
+    pub_date = str(post.published).split(' ')[:4]
+
     our_people_score = sum(item[1][1] for item in authors)
     if our_people_score < 1:
         return
     else:
         log.info(f"Found {our_people_score=} from {authors=}")
-    arxiv_id = post.link.rsplit('/', 1)[1]
 
-    if not DEMO_MODE or DEMO_MODE:
-        evidence, gather_success = gather_affiliation_evidence(arxiv_id)
-        if gather_success and evidence == 0:
-            log.debug(f'Skipping {arxiv_id=} for lack of evidence: {our_people_score=} {evidence=}')
-            return  # no matches to UCSC_RE
-        elif not gather_success and our_people_score < 2:
-            return  # could be two partial matches
-    # The summary now also contains the arXiv ID and the type of posting (e.g.
-    # new, replacement) - just grab the abstract
+    arxiv_id = post.link.rsplit('/', 1)[1]
+    evidence, gather_success = gather_affiliation_evidence(arxiv_id)
+    if gather_success and evidence == 0:
+        log.debug(f'Skipping {arxiv_id=} for lack of evidence: {our_people_score=} {evidence=}')
+        return  # no matches to UCSC_RE
+    elif not gather_success and our_people_score < 2:
+        return  # could be two partial matches
+
+    #the summary now also contains the arXiv ID and the type of posting (e.g. new, replacement) - just grab the abstract
     summary = BeautifulSoup(post.summary, features="lxml").text
     abstract = summary.split('Abstract: ')[-1]
     out = {
@@ -441,7 +449,9 @@ def unpack_feed_entry(post, people):
         'abstract': abstract.replace('\n', ' '),
         'arxiv_id': arxiv_id,
         'html_arxiv_id': post.id.rsplit(':', 1)[1],
+        'pub_date': " ".join(pub_date),
     }
+
     return out
 
 

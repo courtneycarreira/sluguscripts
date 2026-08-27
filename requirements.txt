@@ -7,3 +7,4 @@ lxml==4.9.3
 numpy
 pandas
 argparse
+pylatexenc
