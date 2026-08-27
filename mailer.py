@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import datetime
+import time
 import os
 import os.path
 import pickle
@@ -9,12 +10,6 @@ import sys
 import unicodedata
 import smtplib
 import ssl
-# https://stackoverflow.com/questions/33857698/sending-email-from-python-using-starttls
-_DEFAULT_CIPHERS = (
-    'ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+HIGH:'
-    'DH+HIGH:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+HIGH:RSA+3DES:!aNULL:'
-    '!eNULL:!MD5'
-)
 from dateutil.parser import parse
 from dateutil import tz
 from bs4 import BeautifulSoup
@@ -23,6 +18,11 @@ import jinja2
 import requests
 import tarfile
 import io
+import argparse
+
+from email.message import EmailMessage
+from email.headerregistry import Address
+from email.utils import make_msgid
 
 # import global config variables
 from config import *
@@ -32,13 +32,6 @@ DEMO_MODE = False
 
 HERE = os.path.dirname(__file__)
 
-def soupify(url):
-    import warnings
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        req = requests.get(url, verify=False, headers=headers)
-    return BeautifulSoup(req.text, features="lxml")
-
 FACULTY = 1
 POSTDOC = 2
 STAFF = 2
@@ -47,8 +40,72 @@ STUDENT = 3
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
+UCSC_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu)', flags=re.IGNORECASE)
+
+# https://stackoverflow.com/questions/33857698/sending-email-from-python-using-starttls
+_DEFAULT_CIPHERS = (
+    'ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+HIGH:'
+    'DH+HIGH:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+HIGH:RSA+3DES:!aNULL:'
+    '!eNULL:!MD5'
+)
 
 
+#######################################
+# Create command line argument parser
+#######################################
+def create_parser():
+
+    #handle user input with argparse
+    parser = argparse.ArgumentParser(
+        description="Flags and options from user.")
+
+    parser.add_argument('--skip_new_directory',
+        dest='skip_new_directory',
+        action='store_true',
+        help='Skips new directory build and instead uses existing directory. (default: False)',
+        default=False)
+
+    parser.add_argument('--daily_email',
+        dest='daily_email',
+        action='store_true',
+        help='If desired, switch mailer to daily email. (default: False)',
+        default=False)
+
+    parser.add_argument('--debug',
+        dest='debug',
+        action='store_true',
+        help='While debugging the actual email generation, will save local file verions, will NOT send emails. (default: True)',
+        default=True)
+
+    parser.add_argument('--mail_test',
+        dest='mail_test',
+        action='store_true',
+        help='Will send test emails. (default: False)',
+        default=False)
+
+    parser.add_argument('-v', '--verbose',
+        dest='verbose',
+        action='store_true',
+        help='Print helpful information to the screen? (default: False)',
+        default=False)
+
+    return parser
+
+
+#######################################
+# soupify() function
+#######################################
+def soupify(url):
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        req = requests.get(url, verify=False, headers=headers)
+    return BeautifulSoup(req.text, features="lxml")
+
+
+#######################################
+# gather_affiliation_evidence() function
+#######################################
 def gather_affiliation_evidence(arxiv_id):
     url = f'https://arxiv.org/e-print/{arxiv_id}'
     evidence = 0
@@ -57,19 +114,20 @@ def gather_affiliation_evidence(arxiv_id):
         buff = io.BytesIO(res.content)
         archive = tarfile.open(fileobj=buff)
         texfiles = [m for m in archive.getmembers() if m.name.lower().endswith('.tex')]
-
-        UOFA_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu)', flags=re.IGNORECASE)
-
+        
         for info in texfiles:
             fh = archive.extractfile(info)
             contents = fh.read().decode('utf8')
-            matches = UOFA_RE.findall(contents)
+            matches = UCSC_RE.findall(contents)
             evidence += len(matches)
     except Exception as e:
         log.debug(e)
     return evidence
 
 
+#######################################
+# normalize_caseless() function
+#######################################
 def normalize_caseless(text):
     text = re.sub(r'[^\w]', ' ', text)
     # thanks to https://stackoverflow.com/a/29247821
@@ -77,6 +135,10 @@ def normalize_caseless(text):
     text = text.strip()
     return text
 
+
+#######################################
+# build_directory() function
+#######################################
 def build_directory():
     people = {}
     base_link = 'https://astronomy.ucsc.edu'
@@ -211,12 +273,21 @@ def build_directory():
 
     return people
 
+
+#######################################
+# test_name_regex() function
+#######################################
 NAME_RE = re.compile(r'^(?P<first>(?:(?P<initial>\w).*)[\. ]+)+(?P<last>\w.*)$')
 def test_name_regex():
     assert NAME_RE.match('J.Long').groupdict() == {'first': 'J.', 'initial': 'J', 'last': 'Long'}
     assert NAME_RE.match('Joseph D. Long').groupdict() == {'first': 'Joseph D. ', 'initial': 'J', 'last': 'Long'}
     assert NAME_RE.match('J. D. Long').groupdict() == {'first': 'J. D. ', 'initial': 'J', 'last': 'Long'}
     assert NAME_RE.match('J Long').groupdict() == {'first': 'J ', 'initial': 'J', 'last': 'Long'}
+
+
+#######################################
+# test_initial_regex() function
+#######################################
 INITIAL_RE = re.compile(r'^\w(\.|\s|$)')
 def test_initial_regex():
     assert INITIAL_RE.match('J. D.')
@@ -225,12 +296,20 @@ def test_initial_regex():
     assert INITIAL_RE.match('J')
     assert INITIAL_RE.match('J D')
 
+
+#######################################
+# strip_initials() function and test_strip_initials() function
+#######################################
 ALL_INITIALS_RE = re.compile(r'\b\w\.?\s')
 def strip_initials(names):
     return ' '.join(ALL_INITIALS_RE.sub('', names).split())
 def test_strip_initials():
     assert strip_initials('J. Long') == 'Long'
 
+
+#######################################
+# approximate_name_lookup() function
+#######################################
 def approximate_name_lookup(name, people):
     # normalize at input boundary so comparisons are simply ==
     normalized_name = normalize_caseless(name)
@@ -273,6 +352,10 @@ def approximate_name_lookup(name, people):
             return (person_last, person_first), score
     return None, 0
 
+
+#######################################
+# test_approximate_name_lookup() function
+#######################################
 def test_approximate_name_lookup():
     people = {
         ('dave', 'a. bob c.'): None,
@@ -285,19 +368,24 @@ def test_approximate_name_lookup():
     assert approximate_name_lookup('G. Hausschuh', people) == (('hausschuh', 'georgina'), 1)
     assert approximate_name_lookup('{M. Navarro Rodrigo}', people) == (('rodrigo', 'marco navarro'), 1)
 
-UOFA_RE = re.compile(r'(university of arizona|steward observatory|arizona\.edu|lbto\.org|gmto\.org)', flags=re.IGNORECASE)
 
+#######################################
+# evidence_in_texfile() function
+#######################################
 def evidence_in_texfile(fh):
     evidence = 0
     for line in fh:
         line = line.decode('utf8')
         if line[0] == '%':
             continue
-        matches = UOFA_RE.findall(line)
+        matches = UCSC_RE.findall(line)
         evidence += len(matches)
     return evidence
 
 
+#######################################
+# gather_affiliation_evidence() function
+#######################################
 def gather_affiliation_evidence(arxiv_id):
     url = f'https://arxiv.org/e-print/{arxiv_id}'
     evidence = 0
@@ -318,6 +406,9 @@ def gather_affiliation_evidence(arxiv_id):
     return evidence, gather_success
 
 
+#######################################
+# unpack_feed_entry() function
+#######################################
 def unpack_feed_entry(post, people):
     title = post.title
     arxiv_area = post.tags[0]['term']
@@ -326,7 +417,6 @@ def unpack_feed_entry(post, people):
         BeautifulSoup(post.author, features="lxml").text.split(',')]
     authors = [(name, approximate_name_lookup(name, people)) for name in author_names]
     our_people_score = sum(item[1][1] for item in authors)
-    print(our_people_score)
     if our_people_score < 1:
         return
     else:
@@ -337,7 +427,7 @@ def unpack_feed_entry(post, people):
         evidence, gather_success = gather_affiliation_evidence(arxiv_id)
         if gather_success and evidence == 0:
             log.debug(f'Skipping {arxiv_id=} for lack of evidence: {our_people_score=} {evidence=}')
-            return  # no matches to UOFA_RE
+            return  # no matches to UCSC_RE
         elif not gather_success and our_people_score < 2:
             return  # could be two partial matches
     # The summary now also contains the arXiv ID and the type of posting (e.g.
@@ -354,13 +444,15 @@ def unpack_feed_entry(post, people):
     }
     return out
 
+
+#######################################
+# get_matching_posts() function
+#######################################
 def get_matching_posts(people):
     feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph')
     posts = []
     all_authors = []
-    print(feed.entries)
     update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
-    print(update_day)
     pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
     today = datetime.datetime.now(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
     if (update_day - today).days != 0:
@@ -371,9 +463,7 @@ def get_matching_posts(people):
                  f"published on {pub_day} UTC")
         sys.exit(1)
     for post in feed.entries:
-        # print(post)
         unpacked_post = unpack_feed_entry(post, people)
-        print(unpacked_post)
         if unpacked_post:
             posts.append(unpacked_post)
             for author in unpacked_post['authors']:
@@ -386,11 +476,14 @@ def get_matching_posts(people):
 
     return posts, all_authors
 
+
+#######################################
+# render_mailing() function
+#######################################
 env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.dirname(__file__)),
     autoescape=jinja2.select_autoescape(['html', 'xml'])
 )
-
 def render_mailing(context_dict):
     html_template = env.get_template('mailing.jinja2.html')
     html_mailing = html_template.render(**context_dict)
@@ -399,12 +492,13 @@ def render_mailing(context_dict):
 
     return html_mailing, text_mailing
 
-from email.message import EmailMessage
-from email.headerregistry import Address
-from email.utils import make_msgid
 
+#######################################
+# compose_email() function
+#######################################
 def compose_email(from_address, to_addresses, subject, html_mailing, text_mailing,
     cc_addresses=None):
+
     msg = EmailMessage()
     msg['Subject'] = subject
     msg['From'] = from_address
@@ -413,11 +507,13 @@ def compose_email(from_address, to_addresses, subject, html_mailing, text_mailin
         msg['CC'] = cc_addresses
     msg.set_content(text_mailing)
     msg.add_alternative(html_mailing, subtype='html')
-    if True: #DEMO_MODE:
-        with open('mailing.eml', 'wb') as f:
-            f.write(bytes(msg))
+
     return msg
 
+
+#######################################
+# send_email() function
+#######################################
 def send_email(msg):
     host = MAIL_SERVER
     port = int(MAIL_PORT)
@@ -436,20 +532,58 @@ def send_email(msg):
     smtp_server.login(user, password)
     smtp_server.send_message(msg)
 
+
+#######################################
+# main() function
+#######################################
 def main():
-    # global
-    DEMO_MODE = True
+
+    #begin timer
+    time_global_start = time.time()
+
+    #create the command line argument parser
+    parser = create_parser()
+
+    #store the command line arguments
+    args = parser.parse_args()
+
+    #print command line arguments
+    if args.verbose:
+        print(f"args.skip_new_directory  {args.skip_new_directory}")
+        print(f"args.daily_email         {args.daily_email}")
+        print(f"args.debug               {args.debug}")
+        print(f"args.mail_test           {args.mail_test}")
+
+    #set local time information
     run_time = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
     tzmst = tz.gettz('America/Los Angeles')
     run_time_local = run_time.astimezone(tzmst)
     day_of_week = run_time_local.strftime('%A')
 
-    if len(sys.argv) > 1:
-        args = sys.argv[1:]
-        if '-d' in args:
-            DEMO_MODE = True
+    # if len(sys.argv) > 1:
+    #     args = sys.argv[1:]
+    #     if '-d' in args:
+    #         DEMO_MODE = True
 
-    people = build_directory()
+    if args.skip_new_directory == False:
+        people = build_directory()
+        directory_to_pickle = {'people': people, 'updated': run_time_local.strftime('%Y-%m-%d %H:%M %Z')}
+        with open('./directory.pickle', 'wb') as f:
+            pickle.dump(directory_to_pickle, f)
+    else:
+        with open('./directory.pickle', 'rb') as f:
+            directory_to_pickle = pickle.load(f)
+            people = directory_to_pickle['people']
+
+    posts, all_authors = get_matching_posts(people)
+
+    context = context = {
+            'people': people,
+            'posts': posts,
+            'all_authors': all_authors,
+            'run_time': run_time_local.strftime('%Y-%m-%d %H:%M %Z'),
+            'day_of_week': day_of_week,
+            }
 
     # if DEMO_MODE and os.path.exists('./demo.pickle'):
     #     with open('./demo.pickle', 'rb') as f:
@@ -461,49 +595,73 @@ def main():
     #         # except run_time, update that in loaded dict
     #         context['run_time'] = run_time_local.strftime('%Y-%m-%d %H:%M %Z')
     #         context['day_of_week'] = day_of_week
-    if True: #else:
-        # people = build_directory()
-        # print(people)
-        posts, all_authors = get_matching_posts(people)
-        print(posts, all_authors)
-        context = {
-            'people': people,
-            'posts': posts,
-            'all_authors': all_authors,
-            'run_time': run_time_local.strftime('%Y-%m-%d %H:%M %Z'),
-            'day_of_week': day_of_week,
-        }
-        if DEMO_MODE:
-            with open('./demo.pickle', 'wb') as f:
-                pickle.dump(context, f)
+    # if True: #else:
+        # # people = build_directory()
+        # # print(people)
+        # context = {
+        #     'people': people,
+        #     'posts': posts,
+        #     'all_authors': all_authors,
+        #     'run_time': run_time_local.strftime('%Y-%m-%d %H:%M %Z'),
+        #     'day_of_week': day_of_week,
+        # }
+        # if DEMO_MODE:
+        #     with open('./demo.pickle', 'wb') as f:
+        #         pickle.dump(context, f)
 
+    #generate HTML and text versions of mailer email
     html_mailing, text_mailing = render_mailing(context)
-    if DEMO_MODE:
-        with open(os.path.join(HERE, 'mailing.html'), 'w') as f:
+
+    #if debugging, save HTML and text versions to view
+    if args.debug:
+        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.html"), 'w') as f:
             f.write(html_mailing)
-        with open(os.path.join(HERE, 'mailing.txt'), 'w') as f:
+        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.txt"), 'w') as f:
             f.write(text_mailing)
 
-    # Compose the email
-    from_addr_spec = MAIL_USERNAME if not DEMO_MODE else 'astro-stewarxiv@list.arizona.edu'
-    from_addr = Address("StewarXiv", addr_spec=from_addr_spec)
-    # decide who to send to depending on content or demoing
-    if not DEMO_MODE and len(posts) > 0:
-        to_addrs = [] #[Address("StewarXiv", addr_spec=MAIL_SENDTO)]
-    else:
-        to_addrs = [] #[Address("ADMIN", addr_spec=MAIL_USERNAME)]
-    subject = f'{day_of_week}\'s update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
-    # Compose the email (also CC the sender of the email)
+    #generate email addresses, subject line, etc.
+    #courtney: commenting all of this out for now, until we understand better what it's doing
+    # from_addr_spec = MAIL_USERNAME if not DEMO_MODE else 'astro-stewarxiv@list.arizona.edu'
+    # from_addr = Address("StewarXiv", addr_spec=from_addr_spec)
+    # # decide who to send to depending on content or demoing
+    # if not DEMO_MODE and len(posts) > 0:
+    #     to_addrs = [] #[Address("StewarXiv", addr_spec=MAIL_SENDTO)]
+    # else:
+    #     to_addrs = [] #[Address("ADMIN", addr_spec=MAIL_USERNAME)]
+    subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
+    
+    #compose the email (also CC the sender of the email)
+    #courtney: line under here is placeholder
+    from_addr, to_addrs = 'test@ucsc.edu', []
     msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing,
         cc_addresses=from_addr)
-    # Send the email
+
+    if args.debug:
+        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.eml"), 'wb') as f:
+            f.write(bytes(msg))
+
+    #send the email
     # send_email(msg)
 
-if __name__ == "__main__":
+    #end timer
+    time_global_end = time.time()
+    log.info(f"Time to execute program: {time_global_end-time_global_start}s.")
+    if args.verbose:
+        print(f"Time to execute program: {time_global_end-time_global_start}s.")
+        
+
+#######################################
+# Run the program
+#######################################
+if __name__=="__main__":
+
     logging.basicConfig(level='WARN')
     log.setLevel('DEBUG')
-    # Set up a file to write the log
+
+    #set up a file to write the log
     fh = logging.FileHandler(os.path.join(HERE, f'logs/{datetime.date.today()}.log'))
     fh.setLevel('DEBUG')
     log.addHandler(fh)
+
+    #run program
     main()
