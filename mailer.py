@@ -565,15 +565,16 @@ def main():
     #     if '-d' in args:
     #         DEMO_MODE = True
 
-    if args.skip_new_directory == False:
+    #generate department directory
+    if os.path.exists('./directory.pickle') and (args.skip_new_directory==True):
+        with open('./directory.pickle', 'rb') as f:
+            directory_to_pickle = pickle.load(f)
+            people = directory_to_pickle['people']
+    else:
         people = build_directory()
         directory_to_pickle = {'people': people, 'updated': run_time_local.strftime('%Y-%m-%d %H:%M %Z')}
         with open('./directory.pickle', 'wb') as f:
             pickle.dump(directory_to_pickle, f)
-    else:
-        with open('./directory.pickle', 'rb') as f:
-            directory_to_pickle = pickle.load(f)
-            people = directory_to_pickle['people']
 
     posts, all_authors = get_matching_posts(people)
 
