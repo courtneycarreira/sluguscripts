@@ -12,4 +12,4 @@ Happy {{ day_of_week }}! Today's astro-ph arXiv update includes {% if posts|coun
 {% endfor %}
 
 ---
-Generated at {{ run_time }}. Adjust options or unsubscribe at https://list.arizona.edu/sympa/info/astro-stewarxiv .
+Generated at {{ run_time }}. Adjust options or unsubscribe at https://list.arizona.edu/sympa/info/astro-stewarxiv. Have feedback? Create an issue at https://github.com/courtneycarreira/sluguscripts/issues.
