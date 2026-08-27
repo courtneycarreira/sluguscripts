@@ -5,3 +5,6 @@ __pycache__
 logs/
 .mailer-venv/
 .DS_Store
+mailing*.html
+mailing*.txt
+mailing*.eml
