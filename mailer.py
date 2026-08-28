@@ -28,20 +28,12 @@ from email.utils import make_msgid
 # import global config variables
 from config import *
 
-log = logging.getLogger(__name__)
-DEMO_MODE = False
-
 HERE = os.path.dirname(__file__)
-
-FACULTY = 1
-POSTDOC = 2
-STAFF = 2
-STUDENT = 3
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
-UCSC_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu)', flags=re.IGNORECASE)
+UCSC_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu|uco|uc santa cruz|lick observatory)', flags=re.IGNORECASE)
 
 # https://stackoverflow.com/questions/33857698/sending-email-from-python-using-starttls
 _DEFAULT_CIPHERS = (
@@ -105,28 +97,6 @@ def soupify(url):
 
 
 #######################################
-# gather_affiliation_evidence() function
-#######################################
-def gather_affiliation_evidence(arxiv_id):
-    url = f'https://arxiv.org/e-print/{arxiv_id}'
-    evidence = 0
-    try:
-        res = requests.get(url, headers=headers)
-        buff = io.BytesIO(res.content)
-        archive = tarfile.open(fileobj=buff)
-        texfiles = [m for m in archive.getmembers() if m.name.lower().endswith('.tex')]
-        
-        for info in texfiles:
-            fh = archive.extractfile(info)
-            contents = fh.read().decode('utf8')
-            matches = UCSC_RE.findall(contents)
-            evidence += len(matches)
-    except Exception as e:
-        log.debug(e)
-    return evidence
-
-
-#######################################
 # normalize_caseless() function
 #######################################
 def normalize_caseless(text):
@@ -170,13 +140,13 @@ def build_directory():
         #     position = h1.select_one(".item-info list-renderer")#[0].text.replace('\n', '')
         #     print(position)
         # except Exception as e:
-        #     log.warning(f"Failed to get position for {name}")
+        #     logger.warning(f"Failed to get position for {name}")
         #     continue
         # # get image
         # try:
         #     image = base_link + ind_page.select('article')[0].select_one('img')['src']
         # except Exception as e:
-        #     log.warning(f"Unable to find image for {name}")
+        #     logger.warning(f"Unable to find image for {name}")
         #     image = None
 
         people[name]= {
@@ -199,14 +169,14 @@ def build_directory():
     #     try:
     #         position = ind_page.find_all("div", class_="field--name-field-az-titles")[0].text.replace('\n', '')
     #     except Exception as e:
-    #         log.warning(f"Failed to get position for {name}")
+    #         logger.warning(f"Failed to get position for {name}")
     #         continue
         
     #     # get image
     #     try:
     #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
     #     except Exception as e:
-    #         log.warning(f"Unable to find image for {name}")
+    #         logger.warning(f"Unable to find image for {name}")
     #         image = None
 
     #     people[name]= {
@@ -233,7 +203,7 @@ def build_directory():
     #     try:
     #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
     #     except Exception as e:
-    #         log.warning(f"Unable to find image for {name}")
+    #         logger.warning(f"Unable to find image for {name}")
     #         image = None
 
     #     people[name]= {
@@ -260,7 +230,7 @@ def build_directory():
     #     try:
     #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
     #     except Exception as e:
-    #         log.warning(f"Unable to find image for {name}")
+    #         logger.warning(f"Unable to find image for {name}")
     #         image = None
 
     #     people[name]= {
@@ -316,7 +286,7 @@ def approximate_name_lookup(name, people):
     normalized_name = normalize_caseless(name)
     name_match = NAME_RE.match(normalized_name)
     if not name_match:
-        log.warning(f"Unable to parse {normalized_name=} with regex")
+        logger.warning(f"Unable to parse {normalized_name=} with regex")
         return None, 0
     parts = name_match.groupdict()
     first_names = parts['first'].strip()
@@ -392,7 +362,7 @@ def gather_affiliation_evidence(arxiv_id):
     evidence = 0
     gather_success = False
     try:
-        log.debug(f"Gathering evidence from {url}")
+        logger.debug(f"Gathering evidence from {url}")
         res = requests.get(url, headers=headers)
         buff = io.BytesIO(res.content)
         archive = tarfile.open(fileobj=buff)
@@ -401,9 +371,9 @@ def gather_affiliation_evidence(arxiv_id):
             fh = archive.extractfile(info)
             evidence += evidence_in_texfile(fh)
         gather_success = True
-        log.info(f'Found {evidence=} for {arxiv_id=}')
+        logger.info(f'Found {evidence=} for {arxiv_id=}')
     except Exception as e:
-        log.debug(e)
+        logger.debug(e)
     return evidence, gather_success
 
 
@@ -429,12 +399,12 @@ def unpack_feed_entry(post, people):
     if our_people_score < 1:
         return
     else:
-        log.info(f"Found {our_people_score=} from {authors=}")
+        logger.info(f"Found {our_people_score=} from {authors=}")
 
     arxiv_id = post.link.rsplit('/', 1)[1]
     evidence, gather_success = gather_affiliation_evidence(arxiv_id)
     if gather_success and evidence == 0:
-        log.debug(f'Skipping {arxiv_id=} for lack of evidence: {our_people_score=} {evidence=}')
+        logger.debug(f'Skipping {arxiv_id=} for lack of evidence: {our_people_score=} {evidence=}')
         return  # no matches to UCSC_RE
     elif not gather_success and our_people_score < 2:
         return  # could be two partial matches
@@ -466,10 +436,10 @@ def get_matching_posts(people):
     pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
     today = datetime.datetime.now(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
     if (update_day - today).days != 0:
-        log.warn(f"Mailer was invoked but feed was last updated on {update_day} UTC")
+        logger.warning(f"Mailer was invoked but feed was last updated on {update_day} UTC")
         sys.exit(1)
     if (pub_day - today).days != 0:
-        log.warn(f"Mailer was invoked but content in feed was last " +
+        logger.warning(f"Mailer was invoked but content in feed was last " +
                  f"published on {pub_day} UTC")
         sys.exit(1)
     for post in feed.entries:
@@ -656,7 +626,7 @@ def main():
 
     #end timer
     time_global_end = time.time()
-    log.info(f"Time to execute program: {time_global_end-time_global_start}s.")
+    logger.info(f"Time to execute program: {time_global_end-time_global_start}s.")
     if args.verbose:
         print(f"Time to execute program: {time_global_end-time_global_start}s.")
         
@@ -666,13 +636,15 @@ def main():
 #######################################
 if __name__=="__main__":
 
-    logging.basicConfig(level='WARN')
-    log.setLevel('DEBUG')
-
-    #set up a file to write the log
-    fh = logging.FileHandler(os.path.join(HERE, f'logs/{datetime.date.today()}.log'))
-    fh.setLevel('DEBUG')
-    log.addHandler(fh)
+    #set log file
+    logging.basicConfig(
+        level=logging.DEBUG,                  
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",         
+        filename=os.path.join(HERE, f'logs/{datetime.date.today()}.log'),                   
+        filemode="w"                          #"w" overwrites file each run, "a" appends
+    )
+    logger = logging.getLogger(__name__)
 
     #run program
     main()
