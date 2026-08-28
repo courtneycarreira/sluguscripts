@@ -30,6 +30,11 @@ from config import *
 
 HERE = os.path.dirname(__file__)
 
+FACULTY = 1
+POSTDOC = 2
+STAFF = 2
+STUDENT = 3
+
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
