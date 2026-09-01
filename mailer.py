@@ -289,6 +289,7 @@ def test_strip_initials():
 # approximate_name_lookup() function
 #######################################
 def approximate_name_lookup(name, people):
+
     # normalize at input boundary so comparisons are simply ==
     normalized_name = normalize_caseless(name)
     name_match = NAME_RE.match(normalized_name)
@@ -301,15 +302,20 @@ def approximate_name_lookup(name, people):
     last_name = parts['last'].strip()
 
     for person_last, person_first in people:
+
         score = 0
         if person_last == last_name:
             # last name matches, but what about first?
             if person_first == first_names:
                 # easy: last name matches, first name(s) match
                 score = 2
-            elif first_names.startswith(person_first):
+            if person_first.split(' ')[0] == first_names:
+                # easy: last name matches, first name(s) match
                 score = 2
-            elif first_names != first_initial and first_names in person_first:
+            elif not set(first_names.split(' ')).isdisjoint(person_first.split(' ')):
+                # easy-ish: last name matches, but disjoint middle name reporting, still probably the right person
+                score = 2
+            elif first_names != first_initial and first_names in person_first.split(' '):
                 # first_names is a substring of person_first
                 # does person_first match after removing initials?
                 if strip_initials(first_names).startswith(person_first):
@@ -339,12 +345,14 @@ def test_approximate_name_lookup():
         ('dave', 'a. bob c.'): None,
         ('ferris', 'edgar'): None,
         ('hausschuh', 'georgina'): None,
-        ('rodrigo', 'marco navarro'): None
+        ('rodrigo', 'marco navarro'): None,
+        ('isabel j', 'kain'): None
     }
     assert approximate_name_lookup('edgar ferris', people) == (('ferris', 'edgar'), 2)
     assert approximate_name_lookup('bob dave', people) == (('dave', 'a. bob c.'), 2)
     assert approximate_name_lookup('G. Hausschuh', people) == (('hausschuh', 'georgina'), 1)
     assert approximate_name_lookup('{M. Navarro Rodrigo}', people) == (('rodrigo', 'marco navarro'), 1)
+    assert approximate_name_lookup('Isabel J. Kain', people) == (('kain', 'isabel j'), 0)
 
 
 #######################################
@@ -546,11 +554,6 @@ def main():
     tzmst = tz.gettz('America/Los Angeles')
     run_time_local = run_time.astimezone(tzmst)
     day_of_week = run_time_local.strftime('%A')
-
-    # if len(sys.argv) > 1:
-    #     args = sys.argv[1:]
-    #     if '-d' in args:
-    #         DEMO_MODE = True
 
     #generate department directory
     if os.path.exists('./directory.pickle') and (args.skip_new_directory==True):
