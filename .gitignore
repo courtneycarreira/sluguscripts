@@ -8,3 +8,4 @@ logs/
 mailing*.html
 mailing*.txt
 mailing*.eml
+.vscode

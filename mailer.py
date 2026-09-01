@@ -26,7 +26,7 @@ from email.headerregistry import Address
 from email.utils import make_msgid
 
 # import global config variables
-from config import *
+#from config import *
 
 HERE = os.path.dirname(__file__)
 
@@ -645,6 +645,9 @@ def main():
 # Run the program
 #######################################
 if __name__=="__main__":
+
+    # Create logs directory if it doesn't exist
+    os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)
 
     #set log file
     logging.basicConfig(
