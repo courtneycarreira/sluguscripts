@@ -119,47 +119,49 @@ def build_directory():
     people = {}
     base_link = 'https://astronomy.ucsc.edu'
 
-    faculty_page = soupify('https://astronomy.ucsc.edu/people/#faculty')
-    for facwrap in faculty_page.select('.item-body'): #'.section-item h-card wrap'):
+    people_page = soupify('https://astronomy.ucsc.edu/people/')
+    # for facwrap in people_page.select('.item-body'): #'.section-item h-card wrap'):
+    for title_section in people_page.select('.section-container.ucsc-block-directory.tiled-page'):
+        for personwrap in title_section.select('.section-item.h-card.wrap'):
+            #print(personwrap)
 
-        # print(facwrap)
+            #item_body = personwrap.select_one('.item_body')
+            h1 = personwrap.select_one('h3')
+            # print(h1)
+            name = normalize_caseless(h1.select_one('.p-name').text.strip()).split(' ')
+            # print(name)
+            # print(firstname)
+            # lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
+            # name = (firstname, lastname)
+            back = " ".join(name[:-1])
+            # print(back)
+            name = (name[-1], back)
+            # print(name)
 
-        h1 = facwrap.select_one('h3')
-        # print(h1)
-        name = normalize_caseless(h1.select_one('.p-name').text.strip()).split(' ')
-        # print(name)
-        # print(firstname)
-        # lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
-        # name = (firstname, lastname)
-        back = " ".join(name[:-1])
-        # print(back)
-        name = (name[-1], back)
-        # print(name)
+            # retrieve link to individual page
+            ind_page_link = personwrap.find_all('a', href=True)[0]['href']
+            ind_page = soupify(base_link + ind_page_link)
 
-        # retrieve link to individual page
-        # ind_page_link = facwrap.find_all('a', href=True)[0]['href']
-        # ind_page = soupify(base_link + ind_page_link)
+            # get position
+            # try:
+            #     position = h1.select_one(".item-info list-renderer")#[0].text.replace('\n', '')
+            #     print(position)
+            # except Exception as e:
+            #     log.warning(f"Failed to get position for {name}")
+            #     continue
+            # get image
+            try:
+                image = ind_page.select('.item-image.square-img.imgLiquid')[0].select_one('img')['src'] # base_link + ind_page.select('article')[0].select_one('img')['src']
+            except Exception as e:
+                log.warning(f"Unable to find image for {name}")
+                image = None
 
-        # get position
-        # try:
-        #     position = h1.select_one(".item-info list-renderer")#[0].text.replace('\n', '')
-        #     print(position)
-        # except Exception as e:
-        #     logger.warning(f"Failed to get position for {name}")
-        #     continue
-        # # get image
-        # try:
-        #     image = base_link + ind_page.select('article')[0].select_one('img')['src']
-        # except Exception as e:
-        #     logger.warning(f"Unable to find image for {name}")
-        #     image = None
-
-        people[name]= {
-            'role': FACULTY,
-            # 'position': position,
-            # 'image': image, 
-            # 'page': base_link + ind_page_link,
-        }
+            people[name]= {
+                # 'role': FACULTY,
+                # 'position': position,
+                'image': image, 
+                # 'page': base_link + ind_page_link,
+            }
 
     # postdoc_page = soupify('https://astronomy.ucsc.edu/people/#postdoc')
     # for wrap in postdoc_page.select('.card-body'):
@@ -442,11 +444,11 @@ def get_matching_posts(people):
     today = datetime.datetime.now(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
     if (update_day - today).days != 0:
         logger.warning(f"Mailer was invoked but feed was last updated on {update_day} UTC")
-        sys.exit(1)
+        sys.exit(1) # NEEDS TO BE COMMENTED OUT FOR TESTING
     if (pub_day - today).days != 0:
         logger.warning(f"Mailer was invoked but content in feed was last " +
                  f"published on {pub_day} UTC")
-        sys.exit(1)
+        sys.exit(1) # NEEDS TO BE COMMENTED OUT FOR TESTING
     for post in feed.entries:
         unpacked_post = unpack_feed_entry(post, people)
         if unpacked_post:
