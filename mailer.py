@@ -26,7 +26,7 @@ from email.headerregistry import Address
 from email.utils import make_msgid
 
 # import global config variables
-#from config import *
+from config import *
 
 HERE = os.path.dirname(__file__)
 
@@ -63,10 +63,10 @@ def create_parser():
         help='Skips new directory build and instead uses existing directory. (default: False)',
         default=False)
 
-    parser.add_argument('--daily_email',
-        dest='daily_email',
+    parser.add_argument('--weekly_email',
+        dest='weekly_email',
         action='store_true',
-        help='If desired, switch mailer to daily email. (default: False)',
+        help='If desired, switch mailer to weekly email. (default: False)',
         default=False)
 
     parser.add_argument('--debug',
@@ -473,6 +473,140 @@ def get_matching_posts(people):
 
 
 #######################################
+# get_matching_posts_weekly() function
+#######################################
+def get_matching_posts_weekly(people, WEEKLY_CACHE_DIR):
+
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    weekday = today.weekday()
+    # Monday = 0
+    # Tuesday = 1
+    # Wednesday = 2
+    # Thursday = 3
+    # Friday = 4
+
+    weekday_names = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+
+    # --------------------------------------------------
+    # Monday: clear data left over from previous week
+    # --------------------------------------------------
+    if weekday == 0:
+        logger.info("Monday: clearing previous weekly feed cache.")
+
+        for filename in os.listdir(WEEKLY_CACHE_DIR):
+            if filename.endswith(".pkl"):
+                os.remove(os.path.join(WEEKLY_CACHE_DIR, filename))
+
+    # --------------------------------------------------
+    # Download today's arXiv feed
+    # --------------------------------------------------
+    feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph')
+    posts = []
+    all_authors = []
+    update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
+    pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
+     
+    if (update_day - today).days != 0:
+        logger.warning(f"Mailer was invoked but feed was last updated on {update_day} UTC")
+        sys.exit(1) # NEEDS TO BE COMMENTED OUT FOR TESTING
+    if (pub_day - today).days != 0:
+        logger.warning(f"Mailer was invoked but content in feed was last " +
+                 f"published on {pub_day} UTC")
+        sys.exit(1) # NEEDS TO BE COMMENTED OUT FOR TESTING
+    
+    # --------------------------------------------------
+    # Process today's posts
+    # --------------------------------------------------
+    for post in feed.entries:
+        unpacked_post = unpack_feed_entry(post, people)
+        if unpacked_post:
+            posts.append(unpacked_post)
+            for author in unpacked_post['authors']:
+                if author[1][0] is not None:
+                    key = author[1][0]
+                    all_authors.append((key, people[key]))
+    # sorting by the key, so by last names
+    all_authors.sort()
+    all_authors = [x[1] for x in all_authors]
+
+    # --------------------------------------------------
+    # Save today's processed data
+    # --------------------------------------------------
+    if weekday <= 4:
+
+        day_name = weekday_names[weekday]
+
+        cache_file = os.path.join(WEEKLY_CACHE_DIR, f"{day_name}.pkl")
+
+        with open(cache_file, "wb") as f:
+            pickle.dump(
+                {
+                    "date": today,
+                    "posts": posts,
+                    "all_authors": all_authors
+                },
+                f
+            )
+
+        logger.info(f"Saved {len(posts)} matching posts for " f"{day_name.capitalize()} to {cache_file}")
+
+    # --------------------------------------------------
+    # Monday - Thursday:
+    # save data, then stop the mailer
+    # --------------------------------------------------
+    if weekday < 4:
+
+        logger.info(f"{weekday_names[weekday].capitalize()}: " f"feed saved. Weekly mail will be generated Friday.")
+
+        sys.exit(0)
+
+    # --------------------------------------------------
+    # Friday:
+    # Read Monday-Friday cache and combine everything
+    # --------------------------------------------------
+    if weekday == 4:
+
+        logger.info("Friday: combining Monday-Friday feed data.")
+
+        weekly_posts = []
+        weekly_authors = []
+
+        for day_name in weekday_names:
+
+            cache_file = os.path.join(WEEKLY_CACHE_DIR, f"{day_name}.pkl")
+
+            if not os.path.exists(cache_file):
+                logger.warning(
+                    f"No cached feed found for {day_name.capitalize()}: "
+                    f"{cache_file}"
+                )
+                continue
+
+            with open(cache_file, "rb") as f:
+                cached_data = pickle.load(f)
+
+            logger.info(
+                f"Loading {len(cached_data['posts'])} posts from "
+                f"{day_name.capitalize()} "
+                f"({cached_data['date']})"
+            )
+
+            weekly_posts.extend(cached_data["posts"])
+            weekly_authors.extend(cached_data["all_authors"])
+
+        logger.info(f"Weekly total: {len(weekly_posts)} matching posts.")
+
+        return weekly_posts, weekly_authors
+
+    # --------------------------------------------------
+    # Should normally never run on weekends
+    # --------------------------------------------------
+    logger.warning("Weekly mailer was invoked on a weekend.")
+
+    sys.exit(0)
+
+
+#######################################
 # render_mailing() function
 #######################################
 env = jinja2.Environment(
@@ -545,7 +679,7 @@ def main():
     #print command line arguments
     if args.verbose:
         print(f"args.skip_new_directory  {args.skip_new_directory}")
-        print(f"args.daily_email         {args.daily_email}")
+        print(f"args.weekly_email        {args.weekly_email}")
         print(f"args.debug               {args.debug}")
         print(f"args.mail_test           {args.mail_test}")
 
@@ -566,7 +700,12 @@ def main():
         with open('./directory.pickle', 'wb') as f:
             pickle.dump(directory_to_pickle, f)
 
-    posts, all_authors = get_matching_posts(people)
+    if args.weekly_email:
+        WEEKLY_CACHE_DIR = os.path.join(HERE, "weekly_feed_cache")
+        os.makedirs(WEEKLY_CACHE_DIR, exist_ok=True)
+        posts, all_authors = get_matching_posts_weekly(people, WEEKLY_CACHE_DIR)
+    else:
+        posts, all_authors = get_matching_posts(people)
 
     context = context = {
             'people': people,

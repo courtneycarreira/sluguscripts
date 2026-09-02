@@ -9,3 +9,4 @@ mailing*.html
 mailing*.txt
 mailing*.eml
 .vscode
+weekly_feed_cache/
