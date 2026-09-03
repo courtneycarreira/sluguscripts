@@ -46,7 +46,10 @@ _DEFAULT_CIPHERS = (
     'DH+HIGH:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+HIGH:RSA+3DES:!aNULL:'
     '!eNULL:!MD5'
 )
-
+MAIL_SERVER = "smtp.gmail.com"
+MAIL_PORT = 587  # TLS Port
+MAIL_USERNAME = "sluguscripts@gmail.com"
+MAIL_PASSWORD = "vabm azht agow gzct"  # Your 16-character App Password
 
 #######################################
 # Create command line argument parser
@@ -644,22 +647,24 @@ def compose_email(from_address, to_addresses, subject, html_mailing, text_mailin
 # send_email() function
 #######################################
 def send_email(msg):
+
     host = MAIL_SERVER
     port = int(MAIL_PORT)
     user = MAIL_USERNAME
     password = MAIL_PASSWORD
 
     # only TLSv1 or higher
-    context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
-    context.options |= ssl.OP_NO_SSLv2
-    context.options |= ssl.OP_NO_SSLv3
-
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.set_ciphers(_DEFAULT_CIPHERS)
     context.set_default_verify_paths()
     context.verify_mode = ssl.CERT_REQUIRED
-    smtp_server = smtplib.SMTP_SSL(host, port=port, context=context)
-    smtp_server.login(user, password)
-    smtp_server.send_message(msg)
+
+    with smtplib.SMTP(host, port) as server:
+        server.ehlo()
+        server.starttls(context=context)
+        server.ehlo()
+        server.login(user, password)
+        server.send_message(msg)
 
 
 #######################################
@@ -715,63 +720,39 @@ def main():
             'day_of_week': day_of_week,
             }
 
-    # if DEMO_MODE and os.path.exists('./demo.pickle'):
-    #     with open('./demo.pickle', 'rb') as f:
-    #         context = pickle.load(f)
-    #         # define locals from pickle
-    #         people = context['people']
-    #         posts = context['posts']
-    #         all_authors = context['all_authors']
-    #         # except run_time, update that in loaded dict
-    #         context['run_time'] = run_time_local.strftime('%Y-%m-%d %H:%M %Z')
-    #         context['day_of_week'] = day_of_week
-    # if True: #else:
-        # # people = build_directory()
-        # # print(people)
-        # context = {
-        #     'people': people,
-        #     'posts': posts,
-        #     'all_authors': all_authors,
-        #     'run_time': run_time_local.strftime('%Y-%m-%d %H:%M %Z'),
-        #     'day_of_week': day_of_week,
-        # }
-        # if DEMO_MODE:
-        #     with open('./demo.pickle', 'wb') as f:
-        #         pickle.dump(context, f)
+    #check if there are even arxiv papers to share
+    if len(posts)>0:
 
-    #generate HTML and text versions of mailer email
-    html_mailing, text_mailing = render_mailing(context)
+        #generate HTML and text versions of mailer email
+        html_mailing, text_mailing = render_mailing(context)
 
-    #if debugging, save HTML and text versions to view
-    if args.debug:
-        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.html"), 'w') as f:
-            f.write(html_mailing)
-        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.txt"), 'w') as f:
-            f.write(text_mailing)
+        #if debugging, save HTML and text versions to view
+        if args.debug:
+            with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.html"), 'w') as f:
+                f.write(html_mailing)
+            with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.txt"), 'w') as f:
+                f.write(text_mailing)
 
-    #generate email addresses, subject line, etc.
-    #courtney: commenting all of this out for now, until we understand better what it's doing
-    # from_addr_spec = MAIL_USERNAME if not DEMO_MODE else 'astro-stewarxiv@list.arizona.edu'
-    # from_addr = Address("StewarXiv", addr_spec=from_addr_spec)
-    # # decide who to send to depending on content or demoing
-    # if not DEMO_MODE and len(posts) > 0:
-    #     to_addrs = [] #[Address("StewarXiv", addr_spec=MAIL_SENDTO)]
-    # else:
-    #     to_addrs = [] #[Address("ADMIN", addr_spec=MAIL_USERNAME)]
-    subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
-    
-    #compose the email (also CC the sender of the email)
-    #courtney: line under here is placeholder
-    from_addr, to_addrs = 'test@ucsc.edu', []
-    msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing,
-        cc_addresses=from_addr)
+        #generate to/from email addresses, subject line, etc.
+        subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
+        from_addr = Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
+        to_addrs = Address("Sluguscripts Email List", addr_spec='sluguscripts-arxiv-emails@googlegroups.com')
+        if args.debug:
+            from_addr, to_addrs = Address("TEST EMAIL", addr_spec='test@gmail.com'), Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
+        
+        #compose the email (also CC the sender of the email)
+        msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing, cc_addresses=from_addr)
 
-    if args.debug:
-        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.eml"), 'wb') as f:
-            f.write(bytes(msg))
+        #save the email out as .eml file for debugging
+        if args.debug:
+            with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.eml"), 'wb') as f:
+                f.write(bytes(msg))
 
-    #send the email
-    # send_email(msg)
+        #send the email
+        send_email(msg)
+
+    else:
+        logger.info('No preprints to share today. Email not generated/sent.')
 
     #end timer
     time_global_end = time.time()
