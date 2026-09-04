@@ -1,7 +1,7 @@
 {%- with name = author[0]|replace(" ", "&nbsp;")|safe, key = author[1][0], score = author[1][1] -%}
 {%- if key -%}
   <div style="display:inline-block; vertical-align:middle; margin:2px;">
-    <a href="{{ people[key]['image'] }}" style="text-decoration:none;">
+    <a href="{{ people[key]['page'] }}" style="text-decoration:none;">
       <img src="{{ people[key]['image'] }}"
            width="40" height="40"
            style="border-radius:50%; vertical-align:middle; margin-right:4px;"

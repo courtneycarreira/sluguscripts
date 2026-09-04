@@ -156,14 +156,14 @@ def build_directory():
             try:
                 image = ind_page.select('.item-image.square-img.imgLiquid')[0].select_one('img')['src'] # base_link + ind_page.select('article')[0].select_one('img')['src']
             except Exception as e:
-                log.warning(f"Unable to find image for {name}")
+                logger.warning(f"Unable to find image for {name}")
                 image = None
 
             people[name]= {
                 # 'role': FACULTY,
                 # 'position': position,
                 'image': image, 
-                # 'page': base_link + ind_page_link,
+                'page': 'https://astronomy.ucsc.edu/people/' + ind_page_link,
             }
 
     # postdoc_page = soupify('https://astronomy.ucsc.edu/people/#postdoc')
