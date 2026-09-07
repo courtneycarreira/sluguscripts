@@ -4,6 +4,7 @@ import time
 import os
 import os.path
 import pickle
+import json
 import re
 import logging
 import sys
@@ -304,37 +305,40 @@ def approximate_name_lookup(name, people):
     first_initial = parts['initial']
     last_name = parts['last'].strip()
 
+    # open directory of known name alternatives
+    with open(os.path.join(HERE, "known_name_alternatives.json"), "r", encoding="utf-8") as file:
+        known_name_alternatives = json.load(file)
+
     for person_last, person_first in people:
 
         score = 0
-        if person_last == last_name:
-            # last name matches, but what about first?
+
+        if person_last == last_name: # last name matches, but what about first?
+
             if person_first == first_names:
                 # easy: last name matches, first name(s) match
                 score = 2
-            if person_first.split(' ')[0] == first_names:
+            elif person_first.split(' ')[0] == first_names:
                 # easy: last name matches, first name(s) match
                 score = 2
             elif not set(first_names.split(' ')).isdisjoint(person_first.split(' ')):
                 # easy-ish: last name matches, but disjoint middle name reporting, still probably the right person
                 score = 2
-            elif first_names != first_initial and first_names in person_first.split(' '):
+            elif (first_names != first_initial and first_names in person_first.split(' ')) and (strip_initials(first_names).startswith(person_first)):
                 # first_names is a substring of person_first
                 # does person_first match after removing initials?
-                if strip_initials(first_names).startswith(person_first):
-                    score = 2
-            elif person_first in first_names:
+                score = 2
+            elif (person_first in first_names) and (strip_initials(first_names).startswith(person_first)):
                 # does first_names match after removing initials?
-                if strip_initials(first_names).startswith(person_first):
-                    score = 2
-            elif person_first[0] == first_initial[0]:
+                score = 2
+            elif (person_first[0] == first_initial[0]) and (INITIAL_RE.match(first_names)):
                 # harder: last name matches, first initial matches
                 # check if it's an initial (single letter followed by space, period, or end of string
-                re_match = INITIAL_RE.match(first_names)
-                if re_match:
-                    score = 1
-                # otherwise, same first initial, different first name, so no match
-            # else: same last name, different first name, no match
+                score = 1
+            elif (last_name in known_name_alternatives.keys()) and (first_names in known_name_alternatives[last_name]):
+                # if this last name has a known alternatives entry
+                # entry matches known alternatives, we know this person for sure!
+                score = 2
         if score:
             return (person_last, person_first), score
     return None, 0
@@ -735,10 +739,14 @@ def main():
 
         #generate to/from email addresses, subject line, etc.
         subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
+        if args.weekly_email:
+            subject = f'Sluguscripts weekly update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
+        
+        #generate to/from email addresses
         from_addr = Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
         to_addrs = Address("Sluguscripts Email List", addr_spec='sluguscripts-arxiv-emails@googlegroups.com')
-        if args.debug:
-            from_addr, to_addrs = Address("TEST EMAIL", addr_spec='test@gmail.com'), Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
+        if (args.debug) or (args.test_email):
+            from_addr, to_addrs = Address("TEST EMAIL", addr_spec='sluguscripts@gmail.com'), Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
         
         #compose the email (also CC the sender of the email)
         msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing, cc_addresses=from_addr)
