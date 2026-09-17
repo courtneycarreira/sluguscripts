@@ -657,7 +657,7 @@ def main():
                 f.write(bytes(msg))
 
         #send the email
-        # send_email(msg)
+        send_email(msg)
 
     else:
         logger.info('No preprints to share today. Email not generated/sent.')
