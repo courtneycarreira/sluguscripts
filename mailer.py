@@ -28,29 +28,20 @@ from email.utils import make_msgid
 
 # import global config variables
 from config import *
-
 HERE = os.path.dirname(__file__)
 
-FACULTY = 1
-POSTDOC = 2
-STAFF = 2
-STUDENT = 3
-
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-}
-UCSC_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu|uco|uc santa cruz|lick observatory)', flags=re.IGNORECASE)
-
+headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 # https://stackoverflow.com/questions/33857698/sending-email-from-python-using-starttls
 _DEFAULT_CIPHERS = (
     'ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+HIGH:'
     'DH+HIGH:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+HIGH:RSA+3DES:!aNULL:'
     '!eNULL:!MD5'
 )
-MAIL_SERVER = "smtp.gmail.com"
-MAIL_PORT = 587  # TLS Port
-MAIL_USERNAME = "sluguscripts@gmail.com"
-MAIL_PASSWORD = "vabm azht agow gzct"  # Your 16-character App Password
+
+UCSC_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu|uco|uc santa cruz|lick observatory)', flags=re.IGNORECASE)
+NAME_RE = re.compile(r'^(?P<first>(?:(?P<initial>\w).*)[\. ]+)+(?P<last>\w.*)$')
+INITIAL_RE = re.compile(r'^\w(\.|\s|$)')
+ALL_INITIALS_RE = re.compile(r'\b\w\.?\s')
 
 #######################################
 # Create command line argument parser
@@ -124,36 +115,19 @@ def build_directory():
     base_link = 'https://astronomy.ucsc.edu'
 
     people_page = soupify('https://astronomy.ucsc.edu/people/')
-    # for facwrap in people_page.select('.item-body'): #'.section-item h-card wrap'):
+    
     for title_section in people_page.select('.section-container.ucsc-block-directory.tiled-page'):
         for personwrap in title_section.select('.section-item.h-card.wrap'):
-            #print(personwrap)
 
-            #item_body = personwrap.select_one('.item_body')
             h1 = personwrap.select_one('h3')
-            # print(h1)
             name = normalize_caseless(h1.select_one('.p-name').text.strip()).split(' ')
-            # print(name)
-            # print(firstname)
-            # lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
-            # name = (firstname, lastname)
             back = " ".join(name[:-1])
-            # print(back)
             name = (name[-1], back)
-            # print(name)
 
             # retrieve link to individual page
             ind_page_link = personwrap.find_all('a', href=True)[0]['href']
             ind_page = soupify(base_link + ind_page_link)
 
-            # get position
-            # try:
-            #     position = h1.select_one(".item-info list-renderer")#[0].text.replace('\n', '')
-            #     print(position)
-            # except Exception as e:
-            #     log.warning(f"Failed to get position for {name}")
-            #     continue
-            # get image
             try:
                 image = ind_page.select('.item-image.square-img.imgLiquid')[0].select_one('img')['src'] # base_link + ind_page.select('article')[0].select_one('img')['src']
             except Exception as e:
@@ -161,97 +135,9 @@ def build_directory():
                 image = None
 
             people[name]= {
-                # 'role': FACULTY,
-                # 'position': position,
                 'image': image, 
                 'page': 'https://astronomy.ucsc.edu/people/' + ind_page_link,
             }
-
-    # postdoc_page = soupify('https://astronomy.ucsc.edu/people/#postdoc')
-    # for wrap in postdoc_page.select('.card-body'):
-    #     name = tuple(wrap.select('h3')[0].text.replace('\n', '').split(' ', 1))
-    #     name = tuple(normalize_caseless(part.strip()) for part in name)[::-1] # lower case and reverse order
-
-    #     # retrieve link to individual page
-    #     ind_page_link = wrap.find_all('a', href=True)[0]['href']
-    #     ind_page = soupify(base_link + ind_page_link)
-
-    #     # get position
-    #     try:
-    #         position = ind_page.find_all("div", class_="field--name-field-az-titles")[0].text.replace('\n', '')
-    #     except Exception as e:
-    #         logger.warning(f"Failed to get position for {name}")
-    #         continue
-        
-    #     # get image
-    #     try:
-    #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
-    #     except Exception as e:
-    #         logger.warning(f"Unable to find image for {name}")
-    #         image = None
-
-    #     people[name]= {
-    #         'role': POSTDOC,
-    #         'position': position,
-    #         'image': image,
-    #         'page': base_link + ind_page_link,
-    #     }
-
-    # student_page = soupify('https://astronomy.ucsc.edu/people/#grads')
-    # for wrap in student_page.select('.card-body'):
-
-    #     h1 = wrap.select_one('h1')
-    #     firstname = h1.select_one('.field--name-field-az-fname').text.strip()
-    #     lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
-    #     name = (firstname, lastname)
-    #     name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
-
-    #     # retrieve link to individual page
-    #     ind_page_link = wrap.find_all('a', href=True)[0]['href']
-    #     ind_page = soupify(base_link + ind_page_link)
-
-    #     # get image
-    #     try:
-    #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
-    #     except Exception as e:
-    #         logger.warning(f"Unable to find image for {name}")
-    #         image = None
-
-    #     people[name]= {
-    #         'role': STUDENT,
-    #         'position': 'Graduate Student',
-    #         'image': image,
-    #         'page': base_link + ind_page_link,
-    #     }
-
-    # staff_page = soupify('https://astro.arizona.edu/people/staff')
-    # for wrap in staff_page.select('.card-body'):
-
-    #     h1 = wrap.select_one('h1')
-    #     firstname = h1.select_one('.field--name-field-az-fname').text.strip()
-    #     lastname  = h1.select_one('.field--name-field-az-lname').text.strip()
-    #     name = (firstname, lastname)
-    #     name = tuple(normalize_caseless(part.strip()) for part in name)[::-1]
-
-    #     # retrieve link to individual page
-    #     ind_page_link = wrap.find_all('a', href=True)[0]['href']
-    #     ind_page = soupify(base_link + ind_page_link)
-
-    #     # get image
-    #     try:
-    #         image = base_link + ind_page.select('article')[0].select_one('img')['src']
-    #     except Exception as e:
-    #         logger.warning(f"Unable to find image for {name}")
-    #         image = None
-
-    #     people[name]= {
-    #         'role': STAFF,
-    #         'position': 'Staff',
-    #         'image': image,
-    #         'page': base_link + ind_page_link,
-    #     }
-
-    # print("finished building directory")
 
     return people
 
@@ -259,7 +145,6 @@ def build_directory():
 #######################################
 # test_name_regex() function
 #######################################
-NAME_RE = re.compile(r'^(?P<first>(?:(?P<initial>\w).*)[\. ]+)+(?P<last>\w.*)$')
 def test_name_regex():
     assert NAME_RE.match('J.Long').groupdict() == {'first': 'J.', 'initial': 'J', 'last': 'Long'}
     assert NAME_RE.match('Joseph D. Long').groupdict() == {'first': 'Joseph D. ', 'initial': 'J', 'last': 'Long'}
@@ -270,7 +155,6 @@ def test_name_regex():
 #######################################
 # test_initial_regex() function
 #######################################
-INITIAL_RE = re.compile(r'^\w(\.|\s|$)')
 def test_initial_regex():
     assert INITIAL_RE.match('J. D.')
     assert not INITIAL_RE.match('Jo. D.')
@@ -282,7 +166,6 @@ def test_initial_regex():
 #######################################
 # strip_initials() function and test_strip_initials() function
 #######################################
-ALL_INITIALS_RE = re.compile(r'\b\w\.?\s')
 def strip_initials(names):
     return ' '.join(ALL_INITIALS_RE.sub('', names).split())
 def test_strip_initials():
@@ -454,9 +337,9 @@ def get_matching_posts(people):
     feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph')
     posts = []
     all_authors = []
-    update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
-    pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
-    today = datetime.datetime.now(datetime.timezone.utc).date() #- datetime.timedelta(days=12) 
+    update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date()
+    pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date()
+    today = datetime.datetime.now(datetime.timezone.utc).date() 
     if (update_day - today).days != 0:
         logger.warning(f"Mailer was invoked but feed was last updated on {update_day} UTC")
         sys.exit(1) # NEEDS TO BE COMMENTED OUT FOR TESTING
