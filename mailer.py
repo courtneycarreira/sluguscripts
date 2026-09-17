@@ -38,7 +38,7 @@ _DEFAULT_CIPHERS = (
     '!eNULL:!MD5'
 )
 
-UCSC_RE = re.compile(r'(university of california, santa cruz|university of california observatories|ucsc\.edu|uco|uc santa cruz|lick observatory)', flags=re.IGNORECASE)
+UCSC_RE = re.compile(r'(university of california, santa cruz|university of california santa cruz|university of california observatories|ucsc\.edu|uco|uc santa cruz|lick observatory)', flags=re.IGNORECASE)
 NAME_RE = re.compile(r'^(?P<first>(?:(?P<initial>\w).*)[\. ]+)+(?P<last>\w.*)$')
 INITIAL_RE = re.compile(r'^\w(\.|\s|$)')
 ALL_INITIALS_RE = re.compile(r'\b\w\.?\s')
@@ -222,6 +222,23 @@ def approximate_name_lookup(name, people):
                 # if this last name has a known alternatives entry
                 # entry matches known alternatives, we know this person for sure!
                 score = 2
+        
+        elif person_first.split(' ')[-1] == last_name:
+            #this is a common case for hispanic people with mutliple last names
+            #if the published last name is actually the first part of a two-part last name, that first part will be listed here within the first names
+            #this could introduce some issues if it's too lax, but hopefully not? reducing scores for this reason
+            
+            if person_first == first_names:
+                # easy: last name matches, first name(s) match
+                score = 1
+            elif person_first.split(' ')[0] == first_names:
+                # easy: last name matches, first name(s) match
+                score = 1
+            elif (last_name in known_name_alternatives.keys()) and (first_names in known_name_alternatives[last_name]):
+                # if this last name has a known alternatives entry
+                # entry matches known alternatives, we know this person for sure!
+                score = 1
+                
         if score:
             return (person_last, person_first), score
     return None, 0
@@ -640,7 +657,7 @@ def main():
                 f.write(bytes(msg))
 
         #send the email
-        send_email(msg)
+        # send_email(msg)
 
     else:
         logger.info('No preprints to share today. Email not generated/sent.')
