@@ -130,6 +130,14 @@ def build_directory():
 
             try:
                 image = ind_page.select('.item-image.square-img.imgLiquid')[0].select_one('img')['src'] # base_link + ind_page.select('article')[0].select_one('img')['src']
+
+                # check to see if the profile photo link is valid; else, redirect to placeholder image
+                response = requests.get(image, timeout=5, allow_redirects=True)
+                image_status_code = response.status_code
+                del response
+                if image_status_code == 500: # no profile photo
+                    image = "https://raw.githubusercontent.com/courtneycarreira/sluguscripts/refs/heads/main/astroslug-square.png"
+
             except Exception as e:
                 logger.warning(f"Unable to find image for {name}")
                 image = None
@@ -351,12 +359,12 @@ def unpack_feed_entry(post, people):
 # get_matching_posts() function
 #######################################
 def get_matching_posts(people):
-    feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph')
+    feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph') # feedparser.parse("test_rss.xml")
     posts = []
     all_authors = []
     update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date()
     pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date()
-    today = datetime.datetime.now(datetime.timezone.utc).date() 
+    today = datetime.datetime.now(datetime.timezone.utc).date() # datetime.datetime.fromisoformat("2026-09-07").date()
     if (update_day - today).days != 0:
         logger.warning(f"Mailer was invoked but feed was last updated on {update_day} UTC")
         sys.exit(1) # NEEDS TO BE COMMENTED OUT FOR TESTING
