@@ -1,4 +1,4 @@
-# ![Icon](astroslug-square.png =50x50) Welcome to the sluguscripts repo!
+# Welcome to the sluguscripts repo!
 
 This repo includes the code for the University of California, Santa Cruz Astronomy department's daily [arXiv astro-ph](https://arxiv.org/archive/astro-ph) mailer, **sluguscripts**. We thank the Astronomy graduate students at the University of Arizona for the inspiration - this repo is forked from theirs, which you can view [here](https://github.com/ua-astro-grads/arxiv-mailer).
 
