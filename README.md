@@ -6,7 +6,7 @@ UCSC Contributors: Courtney Carreira, Diego Garza, Anavi Uppal, Rishank Diwan
 
 ## Getting started
 
-To run this arxiv mailer, there are three primary stages:
+To run this arXiv mailer, there are three primary stages:
 1. Build your department directory by scraping a publicly-available URL.
 2. Cross-match each day's astro-ph posts with your department directory to find which arXiv posts include members of your department.
 3. Generate and send an email every day (or week - info below!).
@@ -41,7 +41,7 @@ All of the magic happens in `mailer.py`. We've copied the following overview of 
 > 
 > 1. Build the personnel directory from the department website, using `build_directory`. If you've ever done web scraping before, it is straightforward code, but (as long as it's working) not important exactly how it accomplishes that. It grabs names (used as a dict key in the form (last_name, first_names)) and headshot ('image').
 > 
-> 2. Fetch the arxiv RSS feed and filter it (`get_matching_posts`). The (maybe confusingly named) `unpack_feed_entry` function returns `None` when there is not enough evidence that this is UCSC people.
+> 2. Fetch the arXiv RSS feed and filter it (`get_matching_posts`). The (maybe confusingly named) `unpack_feed_entry` function returns `None` when there is not enough evidence that this is UCSC people.
 
 >    - This is where it gets a little hairy: `approximate_name_lookup` gives a score of 0, 1, or 2 based on the criteria commented there.
 >    - If a score of 1 or greater is found, it goes to inspect the evidence. `gather_affiliation_evidence` retrieves the LaTeX source of the arXiv posting. It does a case-insensitive search through the whole text for some institution names and domains (see UCSC_RE) and counts the matches as an evidence score. This can push a first initial-last name match over the threshold for inclusion, or skip a posting if none of those strings appear anywhere in the TeX source (you'd expect at least 'santa cruz' to appear somewhere!).
@@ -62,7 +62,7 @@ We've added several command-line flags via `argparse` to `mailer.py`, as follows
 | `--mail_test` | `store_true` | Will send test emails. | False |
 | `-v`, `--verbose` | `store_true` | Prints helpful information to the screen. | False |
 
-Additionally, we've implemented a way to record known name alternatives that aren't otherwise code-able. For example, if someone is named Andrew, but sometimes published as Andy, there's basically no clean way to identify that algorithmically. As such, you can manually add names to `known_name_alternatives.json` which `mailer.py` will check against the arXiv posts' author lists. In this file, all names (first and last) must be *caseless* and all acceptable first names must be listed.
+Additionally, we've implemented a way to record known name alternatives that aren't otherwise code-able. For example, if someone is named Andrew, but sometimes publishes as Andy, there's basically no clean way to identify that algorithmically. As such, you can manually add names to `known_name_alternatives.json` which `mailer.py` will check against the arXiv posts' author lists. In this file, all names (first and last) must be *caseless* and all acceptable first names must be listed.
 
 If this code were being modified for a different department, most of your time would be spent modifying `build_directory` to suit the HTML set-up of your department's directory page.
 
@@ -75,6 +75,5 @@ Diego: add text here!
 
 Here, we compile a list of known issues or shortcomings that we have not solved. Some are not solveable, just choices we made when confronted with an edge case, but some could be fixed with more effort/attention.
 
-* It's nice to have a default image (in our case, `astroslug.png`) to put in the daily email for department members who have not uploaded a photo to their UCSC directory page. The default image loads in the HTML rendering of the email, but not in the *actual* email.
 * To gather evidence of department affiliation for any astro-ph post, `mailer.py` searchs through the TeX source from the arXiv posting. However, not every author uploads the TeX source. In that case, `mailer.py` relies on how closely the author names match how the department members are listed in the directory. If there is no TeX source to check affiliations and all possible author matches are listed by first intials-only (i.e., J. Doe), we consider that insufficient evidence and do not include that post in the email.
 * Conventionally, many Hispanic people have two last names, so they may publish under each last name interchangeably. We have added some support for this within `approximate_name_lookup` in `mailer.py`, but admittedly, it's not perfect.
