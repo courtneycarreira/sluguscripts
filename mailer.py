@@ -130,6 +130,14 @@ def build_directory():
 
             try:
                 image = ind_page.select('.item-image.square-img.imgLiquid')[0].select_one('img')['src'] # base_link + ind_page.select('article')[0].select_one('img')['src']
+
+                # check to see if the profile photo link is valid; else, redirect to placeholder image
+                response = requests.get(image, timeout=5, allow_redirects=True)
+                image_status_code = response.status_code
+                del response
+                if image_status_code == 500: # no profile photo
+                    image = "https://raw.githubusercontent.com/courtneycarreira/sluguscripts/refs/heads/main/astroslug-square.png"
+
             except Exception as e:
                 logger.warning(f"Unable to find image for {name}")
                 image = None
@@ -325,11 +333,20 @@ def unpack_feed_entry(post, people):
 
     arxiv_id = post.link.rsplit('/', 1)[1]
     evidence, gather_success = gather_affiliation_evidence(arxiv_id)
+   
+    #determine whether an arxiv post is perhaps not one of ours
     if gather_success and evidence == 0:
+        #no matches to UCSC_RE
         logger.debug(f'Skipping {arxiv_id=} for lack of evidence: {our_people_score=} {evidence=}')
-        return  # no matches to UCSC_RE
+        return
     elif not gather_success and our_people_score < 2:
-        return  # could be two partial matches
+        #could be two partial matches or one solid match, but hard to say 
+        logger.debug(f'Skipping {arxiv_id=}, possible two partial matches: {our_people_score=} {evidence=}')
+        return  
+    elif not gather_success and (max(item[1][1] for item in authors) == 1):
+        #no affiliation evidence and all possible authors are J. Doe names, so no way to verify
+        logger.debug(f'Skipping {arxiv_id=}, no affiliation evidence and all possible authors are J. Doe names: {our_people_score=} {evidence=}')
+        return  
 
     #the summary now also contains the arXiv ID and the type of posting (e.g. new, replacement) - just grab the abstract
     summary = BeautifulSoup(post.summary, features="lxml").text
@@ -351,12 +368,12 @@ def unpack_feed_entry(post, people):
 # get_matching_posts() function
 #######################################
 def get_matching_posts(people):
-    feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph')
+    feed = feedparser.parse('https://rss.arxiv.org/rss/astro-ph') # feedparser.parse("test_rss.xml")
     posts = []
     all_authors = []
     update_day = parse(feed.feed['updated']).astimezone(datetime.timezone.utc).date()
     pub_day = parse(feed.feed['published']).astimezone(datetime.timezone.utc).date()
-    today = datetime.datetime.now(datetime.timezone.utc).date() 
+    today = datetime.datetime.now(datetime.timezone.utc).date() # datetime.datetime.fromisoformat("2026-09-07").date()
     if (update_day - today).days != 0:
         logger.warning(f"Mailer was invoked but feed was last updated on {update_day} UTC")
         sys.exit(1) # NEEDS TO BE COMMENTED OUT FOR TESTING
