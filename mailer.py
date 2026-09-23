@@ -67,8 +67,8 @@ def create_parser():
     parser.add_argument('--debug',
         dest='debug',
         action='store_true',
-        help='While debugging the actual email generation, will save local file verions, will NOT send emails. (default: True)',
-        default=True)
+        help='While debugging the actual email generation, will save local file verions, will NOT send emails. (default: False)',
+        default=False)
 
     parser.add_argument('--mail_test',
         dest='mail_test',
@@ -645,7 +645,7 @@ def main():
         #generate to/from email addresses
         from_addr = Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
         to_addrs = Address("Sluguscripts Email List", addr_spec='sluguscripts-arxiv-emails@googlegroups.com')
-        if (args.debug) or (args.test_email):
+        if (args.debug) or (args.mail_test):
             from_addr, to_addrs = Address("TEST EMAIL", addr_spec='sluguscripts@gmail.com'), Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
         
         #compose the email (also CC the sender of the email)
