@@ -69,7 +69,39 @@ If this code were being modified for a different department, most of your time w
 
 ### Running `mailer.py` automatically, every day
 
-Diego: add text here!
+Feel free to use any of your favorite scheduling tool to run the python script automatically at a regular cadence. For our deployment, we use [crontab](https://man7.org/linux/man-pages/man5/crontab.5.html) on an iMac connected to the internet via ethernet. We have setup the crontab job to run at 9:35AM every morning on Mondays, Tuesdays, Wednesdays, Thursdays and Fridays, which looks like:
+
+```
+35 09 * * 1-5 bash /Users/sluguscripts/sluguscripts/run_pyemail.sh
+```
+
+where `run_pyemail.sh` takes the form
+
+```
+#!/bin/bash
+
+sluguscript_cwd= # location of GitHub repo
+
+cd $sluguscript_cwd
+
+# create a log file from the bash job running this python script
+# assumes logs_bash has been created as a directory in $sluguscript_cwd
+logfile_suffix=$(date +"%Y_%m_%d")
+logfile=$sluguscript_cwd"/logs_bash/py_mailer_info_"$logfile_suffix".log"
+
+pyvenv=.mailer-venv"/bin/activate"
+
+source $pyvenv
+
+pyscript=$sluguscript_cwd"/mailer.py"
+
+python3 $pyscript --verbose >> $logfile 2>&1
+
+deactivate
+```
+
+The iMac being used is frequently either shutdown or in sleep mode. We use the power management utility [pmset](https://en.wikipedia.org/wiki/Pmset) to turn on the computer, run the script, and place the computer back in sleep mode.
+
 
 ## Known issues
 
