@@ -615,6 +615,9 @@ def main():
     run_time_local = run_time.astimezone(tzmst)
     day_of_week = run_time_local.strftime('%A')
 
+    if args.verbose:
+        print(f"Running mailer at {run_time_local.strftime('%Y-%m-%d %H:%M %Z')}")
+
     #generate department directory
     if os.path.exists('./directory.pickle') and (args.skip_new_directory==True):
         with open('./directory.pickle', 'rb') as f:
