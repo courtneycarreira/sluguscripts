@@ -147,6 +147,12 @@ def build_directory():
                 'page': 'https://astronomy.ucsc.edu/people/' + ind_page_link,
             }
 
+    # manually add Kennedi White (who is in EPS) to the directory
+    people[('white','kennedi')] = {
+        'image': "https://raw.githubusercontent.com/courtneycarreira/sluguscripts/refs/heads/main/astroslug-square.png",
+        'page': 'https://eps.ucsc.edu/people/?directoryprofilecruzid=kwhite11'
+    }
+
     return people
 
 
