@@ -42,9 +42,9 @@ All of the magic happens in `mailer.py`. We've copied the following overview of 
 > 1. Build the personnel directory from the department website, using `build_directory`. If you've ever done web scraping before, it is straightforward code, but (as long as it's working) not important exactly how it accomplishes that. It grabs names (used as a dict key in the form (last_name, first_names)) and headshot ('image').
 > 
 > 2. Fetch the arXiv RSS feed and filter it (`get_matching_posts`). The (maybe confusingly named) `unpack_feed_entry` function returns `None` when there is not enough evidence that this is UCSC people.
-
->    - This is where it gets a little hairy: `approximate_name_lookup` gives a score of 0, 1, or 2 based on the criteria commented there.
->    - If a score of 1 or greater is found, it goes to inspect the evidence. `gather_affiliation_evidence` retrieves the LaTeX source of the arXiv posting. It does a case-insensitive search through the whole text for some institution names and domains (see UCSC_RE) and counts the matches as an evidence score. This can push a first initial-last name match over the threshold for inclusion, or skip a posting if none of those strings appear anywhere in the TeX source (you'd expect at least 'santa cruz' to appear somewhere!).
+> 
+>    - This is where it gets a little hairy: `approximate_name_lookup` gives a score of 0, 1, or 2 based on the criteria commented there. If a score of 1 or greater is found, it goes to inspect the evidence.
+>    - `gather_affiliation_evidence` retrieves the LaTeX source of the arXiv posting. It does a case-insensitive search through the whole text for some institution names and domains (see UCSC_RE) and counts the matches as an evidence score. This can push a first initial-last name match over the threshold for inclusion, or skip a posting if none of those strings appear anywhere in the TeX source (you'd expect at least 'santa cruz' to appear somewhere!).
 > 
 > 3. Generate the email:
 > 
@@ -107,5 +107,6 @@ The iMac being used is frequently either shutdown or in sleep mode. We use the p
 
 Here, we compile a list of known issues or shortcomings that we have not solved. Some are not solveable, just choices we made when confronted with an edge case, but some could be fixed with more effort/attention.
 
+* By design, we find authors in our department via our department directory webpage. However, that will exclude many people we consider to be part of our community, namely: alumni, undergraduate students, and collaborators in other UCSC departments. Manual editing can add new people to the `directory.pickle` file, but admittedly, it's not a convenient solution.
 * To gather evidence of department affiliation for any astro-ph post, `mailer.py` searchs through the TeX source from the arXiv posting. However, not every author uploads the TeX source. In that case, `mailer.py` relies on how closely the author names match how the department members are listed in the directory. If there is no TeX source to check affiliations and all possible author matches are listed by first intials-only (i.e., J. Doe), we consider that insufficient evidence and do not include that post in the email.
 * Conventionally, many Hispanic people have two last names, so they may publish under each last name interchangeably. We have added some support for this within `approximate_name_lookup` in `mailer.py`, but admittedly, it's not perfect.
