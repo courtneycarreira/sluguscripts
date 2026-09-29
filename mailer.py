@@ -686,9 +686,9 @@ def main():
         send_email(msg)
 
     else:
-	no_preprinst_str = 'No preprints to share today. Email not generated/sent.'
+        no_preprinst_str = 'No preprints to share today. Email not generated/sent.'
         logger.info(no_preprinst_str)
-	if args.verbose:
+        if args.verbose:
             print(no_preprinst_str)
 
     #end timer
