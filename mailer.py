@@ -191,6 +191,7 @@ def test_strip_initials():
 #######################################
 def approximate_name_lookup(name, people):
 
+    print("hallo, i am approximatin:", name)
     # normalize at input boundary so comparisons are simply ==
     normalized_name = normalize_caseless(name)
     name_match = NAME_RE.match(normalized_name)
@@ -207,6 +208,7 @@ def approximate_name_lookup(name, people):
         known_name_alternatives = json.load(file)
 
     for person_last, person_first in people:
+        print(f'\t comparing against {person_last}, {person_first}')
 
         score = 0
 
@@ -631,9 +633,12 @@ def main():
             people = directory_to_pickle['people']
     else:
         people = build_directory()
-        directory_to_pickle = {'people': people, 'updated': run_time_local.strftime('%Y-%m-%d %H:%M %Z')}
+        directory_to_save = {'people': people, 'updated': run_time_local.strftime('%Y-%m-%d %H:%M %Z')}
+        #with open('./directory.json', 'w', encoding='utf-8') as f:
+        #    json.dump(directory_to_save, f, ensure_ascii=False, indent=4, sort_keys=True)
+
         with open('./directory.pickle', 'wb') as f:
-            pickle.dump(directory_to_pickle, f)
+            pickle.dump(directory_to_save, f)
 
     if args.weekly_email:
         WEEKLY_CACHE_DIR = os.path.join(HERE, "weekly_feed_cache")
