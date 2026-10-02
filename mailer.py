@@ -650,24 +650,24 @@ def main():
             'day_of_week': day_of_week,
             }
 
+    #generate HTML and text versions of mailer email
+    html_mailing, text_mailing = render_mailing(context)
+
+
+    #if debugging, save HTML and text versions to view
+    if args.debug:
+        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.html"), 'w') as f:
+            f.write(html_mailing)
+        with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.txt"), 'w') as f:
+            f.write(text_mailing)
+
+    #generate to/from email addresses, subject line, etc.
+    subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
+    if args.weekly_email:
+        subject = f'Sluguscripts weekly update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
+        
     #check if there are even arxiv papers to share
     if len(posts)>0:
-
-        #generate HTML and text versions of mailer email
-        html_mailing, text_mailing = render_mailing(context)
-
-        #if debugging, save HTML and text versions to view
-        if args.debug:
-            with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.html"), 'w') as f:
-                f.write(html_mailing)
-            with open(os.path.join(HERE, f"mailing_{run_time_local.strftime('%Y_%m_%d')}.txt"), 'w') as f:
-                f.write(text_mailing)
-
-        #generate to/from email addresses, subject line, etc.
-        subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
-        if args.weekly_email:
-            subject = f'Sluguscripts weekly update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {len(all_authors)} {"colleague" if len(all_authors) == 1 else "colleagues"}'
-        
         #generate to/from email addresses
         from_addr = Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
         to_addrs = Address("Sluguscripts Email List", addr_spec='sluguscripts-arxiv-emails@googlegroups.com')
@@ -686,6 +686,14 @@ def main():
         send_email(msg)
 
     else:
+        from_addr, to_addrs = Address("NO POSTINGS TODAY", addr_spec='sluguscripts@gmail.com'), Address("sluguscripts", addr_spec='sluguscripts@gmail.com')
+        
+        #compose the email (also CC the sender of the email)
+        msg = compose_email(from_addr, to_addrs, subject, html_mailing, text_mailing, cc_addresses=from_addr)
+
+        #send the email
+        send_email(msg)
+
         no_preprinst_str = 'No preprints to share today. Email not generated/sent.'
         logger.info(no_preprinst_str)
         if args.verbose:
