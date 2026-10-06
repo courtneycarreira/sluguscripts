@@ -191,7 +191,6 @@ def test_strip_initials():
 #######################################
 def approximate_name_lookup(name, people):
 
-    print("hallo, i am approximatin:", name)
     # normalize at input boundary so comparisons are simply ==
     normalized_name = normalize_caseless(name)
     name_match = NAME_RE.match(normalized_name)
@@ -208,7 +207,6 @@ def approximate_name_lookup(name, people):
         known_name_alternatives = json.load(file)
 
     for person_last, person_first in people:
-        print(f'\t comparing against {person_last}, {person_first}')
 
         score = 0
 
