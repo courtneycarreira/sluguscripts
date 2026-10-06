@@ -625,15 +625,28 @@ def main():
         print(f"Running mailer at {run_time_local.strftime('%Y-%m-%d %H:%M %Z')}")
 
     #generate department directory
-    if os.path.exists('./directory.pickle') and (args.skip_new_directory==True):
-        with open('./directory.pickle', 'rb') as f:
-            directory_to_pickle = pickle.load(f)
-            people = directory_to_pickle['people']
+    name_delimiter = '#'
+    directory_fPath = './directory.json'
+    if os.path.exists(directory_fPath) and (args.skip_new_directory==True):
+        people = {}
+        with open('./directory.json', "r") as f:
+            json_file = json.load(f)
+            people_jsonfriendly = json_file['people']
+            if args.verbose:
+                update_time = json_file['updated']
+                print(f"Using directory last updated on {update_time}")
+        for key_jsonfriendly,value in people_jsonfriendly.items():
+            people[ tuple( key_jsonfriendly.split(name_delimiter) )] = value
     else:
         people = build_directory()
-        directory_to_pickle = {'people': people, 'updated': run_time_local.strftime('%Y-%m-%d %H:%M %Z')}
-        with open('./directory.pickle', 'wb') as f:
-            pickle.dump(directory_to_pickle, f)
+        people_jsonfriendly = {}
+        for key,value in people.items():
+            key_jsonfriendly = name_delimiter.join(key)
+            people_jsonfriendly[key_jsonfriendly] = value
+
+        directory_to_save = {'people': people_jsonfriendly, 'updated': run_time_local.strftime('%Y-%m-%d %H:%M %Z')}
+        with open(directory_fPath, 'w', encoding='utf-8') as f:
+            json.dump(directory_to_save, f, ensure_ascii=False, indent=4, sort_keys=True)
 
     if args.weekly_email:
         WEEKLY_CACHE_DIR = os.path.join(HERE, "weekly_feed_cache")
