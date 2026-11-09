@@ -132,7 +132,7 @@ def build_directory():
                 image = ind_page.select('.item-image.square-img.imgLiquid')[0].select_one('img')['src'] # base_link + ind_page.select('article')[0].select_one('img')['src']
 
                 # check to see if the profile photo link is valid; else, redirect to placeholder image
-                response = requests.get(image, timeout=5, allow_redirects=True)
+                response = requests.get(image, timeout=5, allow_redirects=True, headers=headers)
                 image_status_code = response.status_code
                 del response
                 if image_status_code == 500: # no profile photo
