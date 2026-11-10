@@ -665,9 +665,9 @@ def main():
             f.write(text_mailing)
 
     #generate to/from email addresses, subject line, etc.
-    subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {unique_author_count} {"colleague" if len(unique_author_count) == 1 else "colleagues"}'
+    subject = f'Sluguscripts {day_of_week} update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {unique_author_count} {"colleague" if lunique_author_count == 1 else "colleagues"}'
     if args.weekly_email:
-        subject = f'Sluguscripts weekly update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {unique_author_count} {"colleague" if len(unique_author_count) == 1 else "colleagues"}'
+        subject = f'Sluguscripts weekly update: {len(posts)} {"preprint" if len(posts) == 1 else "preprints"} from {unique_author_count} {"colleague" if unique_author_count == 1 else "colleagues"}'
         
     #check if there are even arxiv papers to share
     if len(posts)>0:
